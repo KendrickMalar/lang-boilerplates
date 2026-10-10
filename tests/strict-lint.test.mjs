@@ -176,3 +176,22 @@ test("browser sources are not classified as Node API targets", async () => {
       config.rules["n/no-unsupported-features/node-builtins"][0] === 0,
   );
 });
+
+test("focused tests remain unchanged when lint is invoked with --fix", async () => {
+  const root = await copyPreset("node");
+  const source =
+    'import { expect, test } from "vitest";\ntest.only("focused", () => { expect(1).toBe(1); });\n';
+  await write(root, "tests/no-auto-fix.test.ts", source);
+  const result = runAt(root, "pnpm", [
+    "exec",
+    "eslint",
+    "tests/no-auto-fix.test.ts",
+    "--fix",
+  ]);
+  assert.notEqual(result.status, 0, result.output);
+  assert.match(result.output, /vitest\/no-focused-tests/);
+  assert.equal(
+    await readFile(join(root, "tests/no-auto-fix.test.ts"), "utf8"),
+    source,
+  );
+});

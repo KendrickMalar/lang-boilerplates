@@ -6,10 +6,10 @@
   "license": "MIT",
   "packageManager": "pnpm@12.6.0",
   "engines": {
-    "node": ">=24"
+    "node": "^24.15.0 || >=26.0.0"
   },
   "scripts": {
-    "test:static": "node --test tests/common.test.mjs tests/readme.test.mjs",
+    "test:static": "node --test tests/common.test.mjs tests/readme.test.mjs tests/node-support.test.mjs",
     "test:integration": "node --test --test-concurrency=1 tests/node.test.mjs tests/web.test.mjs tests/library.test.mjs tests/hooks.test.mjs tests/strict-lint.test.mjs",
     "test": "node --version && pnpm test:static && pnpm test:integration"
   },

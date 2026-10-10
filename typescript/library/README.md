@@ -2,7 +2,7 @@
 
 npmライブラリ向けの設定一式です。ESMのJSと型定義をdistへ出力します。ルートtestsとsrc内の`*.test.ts`・`*.spec.ts`・`__tests__/`をテスト対象とし、ビルドから除外します。初期設定は誤公開防止のため`private: true`です。公開前にname、version、license、repository、private、exports、配布内容を確認し、公開許可を別途得てください。自動publishは行いません。
 
-このディレクトリだけで設定が完結します。以下のパスは**このREADMEからの相対パス**です。親・兄弟の設定ファイルには依存しません。pnpm 12.6.0、Node 24以上、ESMが前提です。
+このディレクトリだけで設定が完結します。以下のパスは**このREADMEからの相対パス**です。親・兄弟の設定ファイルには依存しません。pnpm 12.6.0、Node 24.15以上の24系またはNode26以上（Node25は対象外）、ESMが前提です。
 
 ## 1. 設定を確認・コピーする
 
@@ -45,7 +45,7 @@ npmライブラリ向けの設定一式です。ESMのJSと型定義をdistへ�
 対象と導入許可を確認してから、対象プロジェクトのrootで実行します。
 
 ```sh
-pnpm install --ignore-scripts
+pnpm install --ignore-scripts --engine-strict
 ```
 
 生成したpnpm-lock.yamlをGitで管理します。prepare/postinstallによるHuskyの自動有効化はありません。pnpmの検証時自動installは禁止、公開24時間未満の依存は拒否、未承認の依存build scriptはエラーにします。現在のesbuild@0.28.2はinstall scriptを不許可とし、optional binaryを使います。エラーを勝手な例外追加や全script許可で回避しません。

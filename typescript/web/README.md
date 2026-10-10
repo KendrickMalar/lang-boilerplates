@@ -2,7 +2,7 @@
 
 汎用Web向けの設定一式です。Bundler解決とViteを使います。ブラウザsrcはDOM型とvite/client型、Node実行の設定はDOMなしのNode型、ブラウザsrcをimportするテストはDOM・vite/client・Node型を持つ別プロジェクトで検査します。`pnpm typecheck`は`tsc -b --noEmit`です。Node実行の設定・テストでは、Lintでも`globalThis`経由を含めてブラウザ専用globalsを拒否します。DOMの実行テストが必要なら環境とルールを別途選びます。React等を選ぶ際はJSX設定・依存・プラグインも追加してください。
 
-このディレクトリだけで設定が完結します。以下のパスは**このREADMEからの相対パス**です。親・兄弟の設定ファイルには依存しません。pnpm 12.6.0、Node 24以上、ESMが前提です。
+このディレクトリだけで設定が完結します。以下のパスは**このREADMEからの相対パス**です。親・兄弟の設定ファイルには依存しません。pnpm 12.6.0、Node 24.15以上の24系またはNode26以上（Node25は対象外）、ESMが前提です。
 
 ## 1. 設定を確認・コピーする
 
@@ -45,7 +45,7 @@
 対象と導入許可を確認してから、対象プロジェクトのrootで実行します。
 
 ```sh
-pnpm install --ignore-scripts
+pnpm install --ignore-scripts --engine-strict
 ```
 
 生成したpnpm-lock.yamlをGitで管理します。prepare/postinstallによるHuskyの自動有効化はありません。pnpmの検証時自動installは禁止、公開24時間未満の依存は拒否、未承認の依存build scriptはエラーにします。現在のesbuild@0.28.2はinstall scriptを不許可とし、optional binaryを使います。エラーを勝手な例外追加や全script許可で回避しません。
@@ -70,8 +70,8 @@ pnpm install --ignore-scripts
 - 不要になったeslint-disableコメントはerrorです。スタイルの細部はPrettierへ任せ、整形とLintの競合ルールを無効化します。
 - Vitestの推奨検査を実行対象のテストに適用し、focused test（.only）・disabled test（.skip等）をerrorにします。.onlyをLintの--fixで勝手に除去する設定にはしません。テストのunsafe検査を一括offにはしません。
 - 正規表現は推奨ルールで、重複した選択肢・誤用・不必要な記述等を検査します。
-- Nodeで実行するコードは、対象プロジェクトのpackage.jsonのengines.nodeに基づく静的Node API検査を行います。実験的APIは明示的な採用判断なしに許可しません。この検査はpluginの対応表で分かる静的APIに限られ、instance method・追加引数・全optionsの互換性を保証するものではありません。
-- Webのbrowser srcにはNode API検査を適用しません。Node実行の設定・テストと、browser srcの型/global境界を分離します。
+- 下記の対象ファイルに限り、対象プロジェクトのpackage.jsonのengines.nodeに基づく静的Node API検査を行います。実験的APIは明示的な採用判断なしに許可しません。この検査はpluginの対応表で分かる静的APIに限られ、instance method・追加引数・全optionsの互換性を保証するものではありません。
+- WebのNode API検査対象は、rootの`*.config.{js,mjs,cjs,ts,tsx}`、`tests/**/*.{js,mjs,cjs,ts,tsx}`、`src/**/*.{test,spec}.{js,mjs,cjs,ts,tsx}`、`src/**/__tests__/**/*.{js,mjs,cjs,ts,tsx}`です。browser製品srcや、このglob外のroot補助スクリプトは対象外です。Node globalsの付与範囲とNode API検査の範囲は同一ではありません。
 - アプリ内部の関数すべてに明示的な戻り値型を強制する設定にはしていません。
 
 固定plugin版は`@vitest/eslint-plugin 1.6.27`、`eslint-plugin-n 18.4.1`、`eslint-plugin-regexp 3.3.1`です。ルール強化により、以前通っていたコードが不合格になる場合があります。エラーの理由を確認して修正し、検査を一括offにして回避しません。
