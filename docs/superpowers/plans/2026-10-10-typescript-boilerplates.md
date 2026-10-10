@@ -15,10 +15,11 @@
 - GitHub先はKendrickMalar/lang-boilerplates、Public、MIT。ローカル正本は `/Users/papillon/Documents/Github/lang-boilerplates`、作業は `/Users/papillon/.config/superpowers/worktrees/lang-boilerplates/typescript-config` のfeat/typescript-configだけです。
 - 配布物は設定とREADMEのみ。製品src、サンプルテスト、HTMLエントリはtypescript/へ置きません。
 - pnpm 12.6.0、ESM、Node >=24。下限未検証ならその旨を報告します。OSのNode/pnpmは変更しません。
-- 初期版: typescript 6.0.3、eslint 10.12.0、@eslint/js 10.0.1、typescript-eslint 8.71.1、globals 17.13.0、prettier 3.9.9、eslint-config-prettier 10.1.8、husky 9.1.7、lint-staged 17.6.0、vitest 5.0.3、vite 8.3.4、tsx 4.23.15、@types/node 24.19.2。
+- 初期版: typescript 6.0.3、eslint 10.12.0、@eslint/js 10.0.1、typescript-eslint 8.71.1、globals 17.13.0、prettier 3.9.9、eslint-config-prettier 10.1.8、husky 9.1.7、lint-staged 17.6.0、vitest 5.0.3、vite 8.3.4、tsx 4.23.15、@types/node 24.19.1。
 - strict、noUncheckedIndexedAccess、exactOptionalPropertyTypes、verbatimModuleSyntax、forceConsistentCasingInFileNamesを有効にします。targetはES2023です。
 - pnpm checkはtypecheck → lint → format:check → test → buildの順で、失敗時に後続を実行しません。
 - prepare/postinstallでHuskyを有効化しません。既存ファイル・Gitフックは許可なしに上書きしません。
+- 2026-10-10改訂（ユーザー承認済み）: 共通pnpm-workspace.yamlにverifyDepsBeforeRun:error、minimumReleaseAge:1440＋strict、strictDepBuilds:true、esbuild@0.28.2 script不許可を追加します。fixtureは独立node_modulesへ専用storeから実installします。synthetic HOMEのmetadata bootstrapはnetwork取得し、誤ってoffline限定にしません。
 - CI、自動コピーCLI、フレームワーク固有設定、CJS二重配布、npm公開は対象外です。
 - 依存インストール、GitHub作成・push、main統合、Profile編集はそれぞれ実行直前に確認します。コミットにAI帰属行を付けません。
 - synthetic HOME、作業専用pnpm store、Gitローカルbare remoteを使用します。テストfixtureとログは証拠として保持し、無許可で削除しません。

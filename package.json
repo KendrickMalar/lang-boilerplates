@@ -1,0 +1,31 @@
+{
+  "name": "lang-boilerplates",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test:static": "node --test tests/common.test.mjs",
+    "test:integration": "node --test --test-concurrency=1 tests/node.test.mjs",
+    "test": "pnpm test:static && pnpm test:integration"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "eslint": "10.12.0",
+    "@eslint/js": "10.0.1",
+    "typescript-eslint": "8.71.1",
+    "globals": "17.13.0",
+    "prettier": "3.9.9",
+    "eslint-config-prettier": "10.1.8",
+    "husky": "9.1.7",
+    "lint-staged": "17.6.0",
+    "vitest": "5.0.3",
+    "vite": "8.3.4",
+    "tsx": "4.23.15",
+    "@types/node": "24.19.1"
+  }
+}

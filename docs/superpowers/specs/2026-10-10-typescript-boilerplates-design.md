@@ -30,7 +30,9 @@ Developmentの言語別テーブルから `typescript/README.md` へ案内し、
 | Node型定義 | **@types/node 24系** | 最小サポート対象より新しいNode APIを型定義で許容しません。 |
 | TypeScript | **6.0.3** | npm latestの7.0.2はtypescript-eslint 8.71.1のpeer要件 >=4.8.4 <6.1.0 を満たさないため採用しません。 |
 
-初期依存は正確な版をpackage.jsonへ記載します。typescript 6.0.3、eslint 10.12.0、@eslint/js 10.0.1、typescript-eslint 8.71.1、globals 17.13.0、prettier 3.9.9、eslint-config-prettier 10.1.8、husky 9.1.7、lint-staged 17.6.0、vitest 5.0.3、vite 8.3.4、tsx 4.23.15、@types/node 24.19.2。用途に不要な直接依存は追加しません。推移依存は利用プロジェクトで生成するpnpm-lock.yamlに固定します。
+初期依存は正確な版をpackage.jsonへ記載します。typescript 6.0.3、eslint 10.12.0、@eslint/js 10.0.1、typescript-eslint 8.71.1、globals 17.13.0、prettier 3.9.9、eslint-config-prettier 10.1.8、husky 9.1.7、lint-staged 17.6.0、vitest 5.0.3、vite 8.3.4、tsx 4.23.15、@types/node 24.19.1。用途に不要な直接依存は追加しません。推移依存は利用プロジェクトで生成するpnpm-lock.yamlに固定します。
+
+2026-10-10改訂: pnpm12の既定自動installとrelease-age自動例外を避けるため、共通 `pnpm-workspace.yaml` にverifyDepsBeforeRun:error、minimumReleaseAge:1440、minimumReleaseAgeStrict:true、strictDepBuilds:trueを設定します。esbuild@0.28.2のinstall scriptは明示的に不許可とし、optional binaryの動作を実検証します。@types/nodeは成熟済み24.19.1を採用します。利用側でも検証コマンドは依存を勝手に導入せず、不整合ならinstall段階へ戻ります。
 
 ## 2. 配置とコピー契約
 
