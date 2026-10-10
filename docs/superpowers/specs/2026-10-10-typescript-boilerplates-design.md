@@ -78,8 +78,8 @@ typescript/
 ### 用途別
 
 - Node/CLI: NodeNext、NodeNext解決、Node型定義。型検査はnoEmit、ビルドはtsconfig.build.jsonからsrcをdistへ出力します。開発実行はtsxです。CLIのbinは製品のentry確定後に設定するためテンプレートでは設定しません。
-- Web: ESNext、Bundler解決、DOM/DOM.Iterable、Vite client型。型検査はnoEmit、ビルドはViteです。テスト環境はNodeを標準にし、DOM実行テストは利用側の要件で別途追加します。
-- Library: NodeNext、NodeNext解決。srcからESM JSと.d.tsをdistへ出力し、main/types/exports/filesはdist/indexに対応させます。初期package.jsonはprivate:trueで誤公開を防ぎます。公開前に製品名、private、license、repository等を利用者が確認します。CJSとの二重配布は対象外です。
+- Web: ESNext、Bundler解決、DOM/DOM.Iterable、Vite client型。型検査はnoEmit、ビルドはViteです。app、Node-onlyのconfig、DOM/vite-client/Node型を持つtestsを別プロジェクトに分離します。テスト環境はNodeを標準にし、DOM実行テストは利用側の要件で別途追加します。
+- Library: NodeNext、NodeNext解決。srcからESM JSと.d.tsをdistへ出力し、main/types/exports/filesはdist/indexに対応させます。初期package.jsonはprivate:trueで誤公開を防ぎます。公開前に製品名、private、license、repository等を利用者が確認します。併置された*.test.ts・*.spec.ts・__tests__をテスト対象にし、ビルドから除外します。ユーザー承認（2026-10-10）により生成物専用distを清掃してからbuildします。symlink・非ディレクトリ・実行root不一致は保持して拒否します。CJSとの二重配布は対象外です。
 
 ### scriptsとhooks
 
@@ -121,7 +121,7 @@ Developmentの `skills/scaffold/references/basic-design.md` のTypeScript行だ�
 - A4: 整形違反、テスト失敗、テスト欠落はそれぞれ対応検査が非0で拒否する。checkは先行検査の失敗で停止する。
 - A5: libraryのdistに製品JSと.d.tsが存在し、テスト・設定ファイルは存在しない。Node出力は実Nodeから起動でき、WebはHTMLエントリ付きfixtureをビルドできる。
 - A6: synthetic HOMEのローカルGitとbare remoteでpre-commit/pre-pushを検証し、不合格pushはremote refを更新しない。外部GitHubへ試験pushしない。
-- A7: pnpm installだけではcore.hooksPathが変化しない。利用者のHOME、グローバルhooksPathとフックbytesは検証前後で不変。
+- A7: pnpm installだけではcore.hooksPathが変化しない。検証fixtureはsynthetic HOMEを使い、利用者のグローバルhooksPathとフックbytesは検証前後で不変。pnpm自身のメタデータキャッシュの生成と、ユーザー設定・フックの変更は区別する。
 - A8: READMEの参照ファイルはすべて存在する。配布対象に製品src、サンプルテスト、node_modules、.husky/_、秘密情報が含まれない。
 - A9: Public GitHubのmain上のREADMEを読み戻してからDevelopment表を1行更新し、他行不変を検証する。
 
@@ -130,7 +130,7 @@ Developmentの `skills/scaffold/references/basic-design.md` のTypeScript行だ�
 | 項目 | 状態 |
 | --- | --- |
 | 会話での要件・構成・MITの確認 | 確認済み |
-| 保存済み設計文書のレビュー | これからユーザーが確認します |
+| 保存済み設計文書のレビュー | 2026-10-10にユーザー承認済み |
 | 詳細実装計画、実装、独立レビュー | 未実施 |
 | インストール、GitHub作成・push、main統合、Profile表更新 | 実行直前の対象別承認が必要です |
 

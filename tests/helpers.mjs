@@ -51,7 +51,12 @@ export async function saveLog(name, result) {
   await mkdir(join(verification, "logs"), { recursive: true });
   await writeFile(
     join(verification, "logs", name + "-" + serial++ + ".log"),
-    result.output,
+    "Test runner " +
+      process.version +
+      "\nExit: " +
+      result.status +
+      "\n" +
+      result.output,
   );
 }
 export async function write(root, path, text) {

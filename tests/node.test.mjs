@@ -75,3 +75,18 @@ test("check stops after type failure before build", async () => {
   const result = await expectResult(root, ["check"], 1, /TS2322/);
   assert.doesNotMatch(result.output, /> tsc -p tsconfig.build.json/);
 });
+
+for (const preset of ["node", "web", "library"]) {
+  test(
+    preset + " config-only copy is not accepted as a verified product",
+    async () => {
+      const root = await copyPreset(preset, { sample: false });
+      await expectResult(
+        root,
+        ["check"],
+        1,
+        /No test files found|No inputs were found/,
+      );
+    },
+  );
+}

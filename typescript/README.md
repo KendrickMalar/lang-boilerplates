@@ -58,11 +58,12 @@ NodeNextで解決し、製品srcだけをdistへ出力します。DOM型は含�
 | [tsconfig.json](./presets/web/tsconfig.json)             | `tsconfig.json`       |
 | [tsconfig.app.json](./presets/web/tsconfig.app.json)     | `tsconfig.app.json`   |
 | [tsconfig.tools.json](./presets/web/tsconfig.tools.json) | `tsconfig.tools.json` |
+| [tsconfig.tests.json](./presets/web/tsconfig.tests.json) | `tsconfig.tests.json` |
 | [eslint.config.mjs](./presets/web/eslint.config.mjs)     | `eslint.config.mjs`   |
 | [vite.config.ts](./presets/web/vite.config.ts)           | `vite.config.ts`      |
 | [vitest.config.ts](./presets/web/vitest.config.ts)       | `vitest.config.ts`    |
 
-Bundler解決とViteを使います。ブラウザsrcはDOM型とvite/client型で検査し、tests/configはNode型を含む別の型環境で検査します。`pnpm typecheck`は`tsc -b --noEmit`です。テストはNode環境のため、DOM操作の実行テストが必要なら別途環境を選びます。React等を選ぶ際は対応するJSX設定・依存・プラグインを追加してください。
+Bundler解決とViteを使います。ブラウザsrcはDOM型とvite/client型、Node実行の設定はDOMなしのNode型、ブラウザsrcをimportするテストはDOM・vite/client・Node型を持つ別プロジェクトで検査します。`pnpm typecheck`は`tsc -b --noEmit`です。設定ファイルとNode環境のテストでは、Lintでもブラウザ専用globalsの利用を拒否します。DOM操作の実行テストが必要なら、別途テスト環境とルールを選びます。React等を選ぶ際は対応するJSX設定・依存・プラグインを追加してください。
 
 ### npmライブラリ
 
@@ -73,8 +74,11 @@ Bundler解決とViteを使います。ブラウザsrcはDOM型とvite/client型�
 | [tsconfig.build.json](./presets/library/tsconfig.build.json) | `tsconfig.build.json` |
 | [eslint.config.mjs](./presets/library/eslint.config.mjs)     | `eslint.config.mjs`   |
 | [vitest.config.ts](./presets/library/vitest.config.ts)       | `vitest.config.ts`    |
+| [clean-dist.mjs](./presets/library/clean-dist.mjs)           | `clean-dist.mjs`      |
 
-ESMのJSと型定義をdistへ出力し、テスト・設定を配布物から除きます。初期設定は誤公開防止のため`private: true`です。公開前にname、version、license、repository、private、exports、配布内容を確認し、公開許可を別途得てください。自動publishは行いません。
+ESMのJSと型定義をdistへ出力し、ルートtestsとsrc内の`*.test.ts`・`*.spec.ts`・`__tests__/`をテスト対象とし、ビルドから除外します。初期設定は誤公開防止のため`private: true`です。公開前にname、version、license、repository、private、exports、配布内容を確認し、公開許可を別途得てください。自動publishは行いません。
+
+**libraryのbuildは、生成物専用のdistを削除してから再生成します。初回build前に既存distの由来と内容を確認し、生成物専用と確認できない場合は停止して相談してください。distに手書きファイルを置かないでください。** コピーしたclean-dist.mjsと実行プロジェクトのルートが一致しない場合、distがsymlinkまたは通常ディレクトリ以外の場合は、削除せず停止します。src・テスト・ログは削除対象ではありません。
 
 ## 4. package.jsonと依存を整える
 

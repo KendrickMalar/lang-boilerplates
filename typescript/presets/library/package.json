@@ -38,7 +38,7 @@
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "test": "vitest run",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node clean-dist.mjs && tsc -p tsconfig.build.json",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build"
   }
 }
