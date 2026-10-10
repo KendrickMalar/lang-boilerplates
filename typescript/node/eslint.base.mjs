@@ -3,11 +3,18 @@ import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 import globals from "globals";
 import prettier from "eslint-config-prettier";
+import vitest from "@vitest/eslint-plugin";
+import n from "eslint-plugin-n";
+import regexp from "eslint-plugin-regexp";
 
-export function createConfig({ environment }) {
+export function createConfig({
+  environment,
+  testFiles = ["tests/**/*.test.ts"],
+}) {
   if (environment !== "node" && environment !== "browser") {
     throw new Error("Choose node or browser for the ESLint environment.");
   }
+  const sourceFiles = ["**/*.{js,mjs,cjs,ts,tsx}"];
   const nodeFiles = [
     "*.config.{js,mjs,cjs,ts,tsx}",
     "tests/**/*.{js,mjs,cjs,ts,tsx}",
@@ -19,6 +26,7 @@ export function createConfig({ environment }) {
   );
   return defineConfig(
     { ignores: ["node_modules/**", "dist/**", "coverage/**", ".husky/_/**"] },
+    { linterOptions: { reportUnusedDisableDirectives: "error" } },
     {
       files: ["**/*.{js,mjs,cjs}"],
       extends: [js.configs.recommended],
@@ -27,7 +35,8 @@ export function createConfig({ environment }) {
       files: ["**/*.{ts,tsx}"],
       extends: [
         js.configs.recommended,
-        tseslint.configs.recommendedTypeChecked,
+        tseslint.configs.strictTypeChecked,
+        tseslint.configs.stylisticTypeChecked,
       ],
       languageOptions: {
         parserOptions: { projectService: true, tsconfigRootDir: process.cwd() },
@@ -35,7 +44,16 @@ export function createConfig({ environment }) {
       rules: {
         "@typescript-eslint/no-explicit-any": "error",
         "@typescript-eslint/no-floating-promises": "error",
+        "@typescript-eslint/consistent-type-imports": [
+          "error",
+          { prefer: "type-imports", disallowTypeAnnotations: true },
+        ],
       },
+    },
+    {
+      files: sourceFiles,
+      plugins: { regexp },
+      rules: regexp.configs["flat/recommended"].rules,
     },
     {
       files: ["**/*.{js,mjs,cjs}"],
@@ -57,6 +75,25 @@ export function createConfig({ environment }) {
           "error",
           { globals: browserOnly, checkGlobalObject: true },
         ],
+      },
+    },
+    {
+      files: environment === "node" ? sourceFiles : nodeFiles,
+      plugins: { n },
+      rules: {
+        "n/no-unsupported-features/node-builtins": [
+          "error",
+          { allowExperimental: false },
+        ],
+      },
+    },
+    {
+      files: testFiles,
+      plugins: vitest.configs.recommended.plugins,
+      rules: {
+        ...vitest.configs.recommended.rules,
+        "vitest/no-focused-tests": ["error", { fixable: false }],
+        "vitest/no-disabled-tests": "error",
       },
     },
     prettier,
