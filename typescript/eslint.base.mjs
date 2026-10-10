@@ -52,7 +52,12 @@ export function createConfig({ environment }) {
     {
       files: nodeFiles,
       languageOptions: { globals: globals.node },
-      rules: { "no-restricted-globals": ["error", ...browserOnly] },
+      rules: {
+        "no-restricted-globals": [
+          "error",
+          { globals: browserOnly, checkGlobalObject: true },
+        ],
+      },
     },
     prettier,
   );

@@ -5,7 +5,11 @@ import { join } from "node:path";
 import { copyPreset, write, expectResult } from "./helpers.mjs";
 test("web preset checks browser code and builds HTML entry", async () => {
   const root = await copyPreset("web");
-  await write(root, "src/browser.ts", "export const title = document.title;\n");
+  await write(
+    root,
+    "src/browser.ts",
+    "export const title = document.title;\nexport const qualifiedTitle = globalThis.document.title;\n",
+  );
   await expectResult(root, ["check"], 0);
   assert.ok(existsSync(join(root, "dist/index.html")));
 });
@@ -61,4 +65,15 @@ test("Node-executed Vite config rejects DOM usage in lint", async () => {
     1,
     /document|no-restricted-globals|no-unsafe/,
   );
+});
+
+test("Node-executed web test helpers reject globalThis DOM access in lint", async () => {
+  const root = await copyPreset("web");
+  await write(
+    root,
+    "tests/dom-helper.ts",
+    "export const title = globalThis.document.title;\n",
+  );
+  await expectResult(root, ["typecheck"], 0);
+  await expectResult(root, ["lint"], 1, /no-restricted-globals/);
 });
