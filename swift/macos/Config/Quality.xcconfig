@@ -1,0 +1,4 @@
+// Connect Debug/Release to every Swift target's Base Configuration.
+SWIFT_VERSION = 6
+SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
+MACOSX_DEPLOYMENT_TARGET = 15.0

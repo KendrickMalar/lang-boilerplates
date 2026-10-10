@@ -1,0 +1,6 @@
+#!/bin/sh
+# Manual opt-in only. Run the same gate as the project-local check.
+set -eu
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+exec sh scripts/check.sh format

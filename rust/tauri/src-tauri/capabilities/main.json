@@ -1,0 +1,8 @@
+{
+  "identifier": "main",
+  "description": "Local main desktop window: read its title only.",
+  "local": true,
+  "windows": ["main"],
+  "platforms": ["macOS", "windows", "linux"],
+  "permissions": ["core:window:allow-title"]
+}

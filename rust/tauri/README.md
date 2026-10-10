@@ -1,0 +1,188 @@
+# Tauri desktop — Rust 品質・権限境界設定
+
+自己完結した単体 `src-tauri` crate 用設定です。Rust **1.92.0** / edition **2024**、
+Tauri **2.12.2** / tauri-build **2.7.1** を固定します。workspace は対象外です。
+製品 Rust source、frontend、Cargo.lock、fixture/cache は配布しません。
+設定は最小の権限候補です。任意の製品 command の安全性や WebView/E2E を保証しません。
+frontend 接続・製品設定・command 登録/入力検査は利用側で完成させます。
+
+## 導入（既存ファイルを保護）
+
+プロジェクト root へ次を同じ相対位置で導入します（親/兄弟設定は不要）。
+
+| コピー元 | コピー先 |
+| --- | --- |
+| [rust-toolchain.toml](rust-toolchain.toml) | `rust-toolchain.toml` |
+| [rustfmt.toml](rustfmt.toml) | `rustfmt.toml` |
+| [.editorconfig](.editorconfig) | `.editorconfig` |
+| [.gitignore](.gitignore) | `.gitignore` |
+| [.cargo/config.toml](.cargo/config.toml) | `.cargo/config.toml` |
+| [src-tauri/Cargo.toml](src-tauri/Cargo.toml) | `src-tauri/Cargo.toml` |
+| [src-tauri/build.rs](src-tauri/build.rs) | `src-tauri/build.rs` |
+| [src-tauri/tauri.conf.json](src-tauri/tauri.conf.json) | `src-tauri/tauri.conf.json` |
+| [src-tauri/capabilities/main.json](src-tauri/capabilities/main.json) | `src-tauri/capabilities/main.json` |
+| [scripts/check.sh](scripts/check.sh) | `scripts/check.sh` |
+| [scripts/check.ps1](scripts/check.ps1) | `scripts/check.ps1` |
+| [.githooks/pre-commit](.githooks/pre-commit) | `.githooks/pre-commit` |
+| [.githooks/pre-push](.githooks/pre-push) | `.githooks/pre-push` |
+| [LICENSE](LICENSE) | `LICENSE.lang-boilerplates` |
+| この README | 参照用。製品 README を上書きしない |
+
+コピー前に既存ファイル・symlink・manifest・Git hooksPath/フックを読み取り、差分を提示して
+承認を得てください。無条件の一括コピーは行いません。既存 Cargo.toml 等は差分統合します。
+製品名・crate 名を合わせ、利用側に非空の `src-tauri/src/main.rs` と `src-tauri/src/lib.rs`、
+実際に実行される Rust test を用意してください。製品のライセンスは変更しません。
+Git hook の導入/有効化や global 設定変更はこのチェックでは行いません。
+
+## tool と lock
+
+POSIX shell または **PowerShell 7+**、既存 **rustup 1.28.2 以上** と named **1.92.0** toolchain、rustfmt/Clippy が必要です。
+チェックはまず `rustup toolchain list` で exact installed 名を確認し、
+その full 名で `rustup which --toolchain …` を呼び、tool path/版を出力します。
+最初の rustup 呼出し前から process-local `RUSTUP_AUTO_INSTALL=0` を適用します。
+自動取得防止の実測は rustup 1.28.2 のみです。他版は個別に不足tool/component検証が必要です。
+不足時に自動 bootstrap/download、default stable への切替、fix/clean は行いません。
+tool 取得は利用側で範囲を確認し、別途承認して実行してください。
+
+依存の取得も明示的に承認してから、プロジェクト root で次を実行します。
+
+```sh
+cargo +1.92.0 generate-lockfile --manifest-path src-tauri/Cargo.toml
+cargo +1.92.0 metadata --locked --format-version 1 --manifest-path src-tauri/Cargo.toml
+```
+
+解決した全推移依存の `rust_version` を確認し、1.92 超過や未知依存では停止して相談します。
+MSRV 未宣言は無条件の合格ではありません。package 名/版/source と未宣言一覧を固定 Cargo.lock の
+SHA256 に結び付け、対象 macOS・Rust1.92.0 の同 lock に対する実 build と非空 test の成功を
+記録する条件でのみ許容します。新しい未知依存・版/source変更・lock変更は停止し、再承認を要求します。
+直接依存の MSRV だけで全体の互換性を宣言しません。Cargo.lock をレビューして製品 Git に保存します。
+macOS で選択されなかった platform graph（Windows/Linux 等）の互換性は、この記録では保証しません。
+`.cargo/config.toml` は互換版への resolver fallback のみで、版不整合を検証済みにしません。
+
+## チェック
+
+```sh
+sh scripts/check.sh all
+sh scripts/check.sh format # format|lint|test|build|all
+```
+
+```powershell
+pwsh -NoProfile -File scripts/check.ps1 -Stage all
+```
+
+順序は `cargo fmt --manifest-path … --check` →
+`cargo clippy --manifest-path … --locked --all-targets -- -D warnings` →
+`cargo test --manifest-path … --locked` → `cargo build --manifest-path … --locked`。
+最初の失敗で停止します（成功0、不合格非0）。test はまず一覧を検査し、実実行で0件/全ignoredも拒否します。
+manifest/source/lock/tool 不足は失敗します。build は利用側 source 次第です。
+空の main/backend unit test の成功だけでは native app を検証できません。
+利用側 source が `tauri::generate_context!()` と runtime builder に設定を接続し、
+`custom-protocol` feature を有効にした frontend 埋込み build を別途実行してください。
+frontendDist 不足が非0になることも確認します。release 最適化/all-features は自動採用しません。
+
+unsafe/未処理 must-use は deny、Clippy all は warn (priority -1)、
+unwrap/expect/todo/dbg は deny、チェックでは全警告を不合格にします。
+stable rustfmt の幅100・4スペース・LF・edition2024を使用します。
+
+caller の `RUSTUP_HOME`、`CARGO_HOME`、`CARGO_TARGET_DIR` を尊重します。
+隔離検証ではプロジェクトの `.verification/native/rust/` 下へ HOME/cache/target を指定してください。
+環境変数はコマンド単位で指定し、global Rustup/Git/shell 設定を変更しません。
+
+## frontend と command ACL の接続（製品側で必須）
+
+`tauri.conf.json` の `productName`/version/`com.example.native-app` は例示値です。
+製品固有の identifier、main window label/title と capability の windows を揃えてください。
+`frontendDist: ../dist` は src-tauri からの相対パス、`devUrl: http://localhost:1420` は
+ローカル開発候補です。実 frontend 出力/開発 server に合わせて変更し、到達性を確認します。
+frontend install/build command は自動実行しません。TypeScript 設定は含めません。
+CSP は self と IPC 接続のみの初期候補です。製品の asset/通信先と開発環境を確認し、必要な
+origin だけを検討してください。CSP と ACL は異なる境界で、片方だけで入力の安全性を保証しません。
+`bundle.active: false` は配布/署名を行わない初期値です。署名・公開・モバイルは対象外です。
+
+capability `main` は config から明示選択され、local/main window/desktop platforms のみに
+`core:window:allow-title`（title 読取り）を与えます。remote、全window wildcard、広い
+filesystem/shell/process/updater は許可しません。不要なら title permission も除いてください。
+
+**custom Rust app command は plugin command と違い、AppManifest 未接続時にはローカルから
+既定で広く使用可能です。空の command リストは安全完成ではありません。**
+製品 source を用意したら、次の全てをレビューしてください。
+
+1. `build.rs` の `AppManifest::new().commands(&[])` に全 custom command 名を列挙する。
+   runtime の `invoke_handler(tauri::generate_handler![...])` と登録を一致させる。
+2. 自動生成される `allow-<command-name>` permission（snake_case は kebab-case）を
+   必要な window の capability にだけ追加する。permission と command を混同しない。
+   過去の自動生成 permission も確認する。JSON を置いただけでは保護できない。
+3. command 実装の引数型/値、path 正規化、scope、権限、エラー伝搬を製品側で検査する。
+   command 登録/permission は input/path/scope validation を代替しない。
+4. 許可/未許可 command、別window、remote origin の IPC 実結果をそれぞれ検査する。
+   設定/permissions を変えたら build して再検証する。
+
+保守 fixture は製品と分離して2個の app command を登録し、1個だけを許可します。
+同じ main の core title は許可、core close は拒否されることを実 IPC dispatcher で確認します。
+AppManifest と app permission を外すと custom command が通る対照試験も行います。
+これは Tauri **mock runtime** 上の backend/ACL 検証であり native WebView/E2E ではありません。
+静的 frontend/生成 icon を用いた macOS native Cargo build は別結果です。
+UI 起動・browser の CSP 実効検証・配布 bundle/署名は行いません。
+
+## 検証範囲・参考元
+
+macOS の実 Cargo fixture 検証を対象とします。**Windows/Linux native 実行は未実施**です。
+PowerShell は未実行（parser 不在、手動確認のみ）で、macOS 成功を他 OS の成功に一般化しません。
+保守 fixture は配布せず、製品 source や frontend を勝手に生成しません。
+
+### リポジトリ保守検証（製品 check とは別）
+
+Python fixture helper は `.verification/native/rust/approved-resolution/` の承認済み固定
+`Cargo.lock` と `approval.json`（package 名/版/source/MSRV、lock hash、実 tool/OS/arch、
+同 lock/source の実 build/test command/exit/出力を参照）を必要とします。
+これらは Git 管理外であり、配布 leaf へ含めません。fresh clone で記録がなければ非0で停止し、
+初回の依存取得・解決集合の審査・実検証・record 作成を別途承認してもらう必要があります。
+毎回 lock を再解決したり、未知集合を自動承認したりしません。
+固定 lock をコピー後、offline/locked metadata と承認集合を照合し、MSRV未宣言があれば
+fixture 固有 target で実 build/test を再実行してから返します。
+同一 test class は自身の同一 crate path/target のみを再利用し、各 test 前に所有 source/config/lock を
+baseline bytes に復元・検査します（旧mtimeは復元しません）。異なる fixture の target は共有しません。
+ignored/失敗test/不正source・config から正常実testへ戻る順序回帰も検査します。
+各 Cargo case の一意な log/JSON receipt に source/config/lock hash、target、command/exit/test件数を保存します。
+各 fixture の `dependency-evidence.json` に lock/source hash、未宣言一覧、tool/OS/arch、
+target、command/exit/出力を紐付けます。失敗・0件・全ignored・未実施は許容条件を満たしません。
+製品 `scripts/check.*` はこの保守用記録に依存せず、leaf の自己完結性を維持します。
+
+- [Tauri capabilities](https://v2.tauri.app/security/capabilities/)
+- [Tauri tests](https://v2.tauri.app/develop/tests/)
+- [Cargo lint 設定](https://doc.rust-lang.org/cargo/reference/manifest.html#the-lints-section)
+- [Clippy](https://doc.rust-lang.org/clippy/usage.html)
+- [Tauri 公式固定 snapshot](https://github.com/tauri-apps/tauri/tree/7fcd8a743497f1895b999bb8c8d9c1241662a476)
+
+本設定はこのリポジトリの MIT ライセンスです。第三者製品の source/config を移植していません。
+Tauri その他依存のライセンスは製品の解決結果に対して別途確認してください。
+
+## 手動 Git フック（別承認で有効化）
+
+コピー/install/check は hooksPath を変更しません。Node/Husky は不要です。
+プロジェクト root で、まず有効な設定の全 origin と既存フックを読み取り確認します。
+
+```sh
+git config --show-origin --get-all core.hooksPath
+git rev-parse --git-path hooks
+```
+
+設定が未定義の場合の最初のコマンドは exit 1 です。既存フック、global hooksPath、
+symlink があれば**有効化を停止して相談**し、既存内容・差分を提示してください。
+local hooksPath は global の既存フックも隠すため、無断で置き換え/連結しません。
+既存フックなし、又は承認済みの統合方針がある場合に限り、変更の別承認後に実行します。
+以下は配布フックを選ぶ場合の例で、既存フックの統合コマンドではありません。
+
+```sh
+chmod +x .githooks/pre-commit .githooks/pre-push
+git config --local core.hooksPath .githooks
+```
+
+pre-commit は `sh scripts/check.sh format`（書換えなし）、pre-push は
+`sh scripts/check.sh all` を実行し、不合格は非0で commit/push を止めます。
+README の tool/lock/source/test と環境変数を hook 実行環境にも用意してください。
+IDE の Git も同じ環境が必要です。iOS test の Simulator boot/app 配置や依存取得は
+フック有効化だけで承認されたことになりません。実行の副作用も先に承認してください。
+手動 check を先に検証し、ローカル bare remote で正常/異常を検査します。
+GitHub への試験 push、global Git 設定変更、`--no-verify` による回避は行いません。
+Windows/Linux の native hook 動作は未実行です。

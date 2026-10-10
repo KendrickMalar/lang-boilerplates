@@ -1,0 +1,5 @@
+/target/
+/src-tauri/target/
+/.verification/
+.DS_Store
+# Cargo.lock belongs in the consuming application repository.

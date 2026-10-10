@@ -1,0 +1,6 @@
+.native-check/
+DerivedData/
+.build/
+*.xcresult
+xcuserdata/
+*.xcuserstate

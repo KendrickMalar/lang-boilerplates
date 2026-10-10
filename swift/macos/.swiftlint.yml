@@ -1,0 +1,11 @@
+opt_in_rules:
+  - empty_count
+  - contains_over_first_not_nil
+  - force_unwrapping
+excluded:
+  - .native-check
+  - DerivedData
+  - .build
+  - Generated
+  - Pods
+  - Carthage
