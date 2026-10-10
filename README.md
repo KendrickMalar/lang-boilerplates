@@ -12,10 +12,10 @@ Scaffoldは言語を選んだ後、当該言語のREADMEを読み、参照され
 
 ## このリポジトリの検証
 
-Node 24以上、pnpm 12.6.0を使います。依存導入前に環境・権限を確認してください。
+Node 24.15以上の24系またはNode26以上（Node25は対象外）、pnpm 12.6.0を使います。依存導入前に環境・権限を確認してください。
 
 ```sh
-pnpm install --ignore-scripts --store-dir .verification/pnpm-store
+pnpm install --ignore-scripts --engine-strict --store-dir .verification/pnpm-store
 pnpm test
 ```
 

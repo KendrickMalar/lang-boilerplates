@@ -2,7 +2,7 @@
 
 Nodeアプリ／CLI向けの設定一式です。NodeNextで解決し、製品srcだけをdistへ出力します。DOM型は含めません。開発時は`pnpm dev`でtsxを使います。CLIのentryが決まった後にbinと実行権限を別途設定してください。
 
-このディレクトリだけで設定が完結します。以下のパスは**このREADMEからの相対パス**です。親・兄弟の設定ファイルには依存しません。pnpm 12.6.0、Node 24以上、ESMが前提です。
+このディレクトリだけで設定が完結します。以下のパスは**このREADMEからの相対パス**です。親・兄弟の設定ファイルには依存しません。pnpm 12.6.0、Node 24.15以上の24系またはNode26以上（Node25は対象外）、ESMが前提です。
 
 ## 1. 設定を確認・コピーする
 
@@ -42,7 +42,7 @@ Nodeアプリ／CLI向けの設定一式です。NodeNextで解決し、製品sr
 対象と導入許可を確認してから、対象プロジェクトのrootで実行します。
 
 ```sh
-pnpm install --ignore-scripts
+pnpm install --ignore-scripts --engine-strict
 ```
 
 生成したpnpm-lock.yamlをGitで管理します。prepare/postinstallによるHuskyの自動有効化はありません。pnpmの検証時自動installは禁止、公開24時間未満の依存は拒否、未承認の依存build scriptはエラーにします。現在のesbuild@0.28.2はinstall scriptを不許可とし、optional binaryを使います。エラーを勝手な例外追加や全script許可で回避しません。
@@ -60,6 +60,24 @@ pnpm install --ignore-scripts
 | `pnpm check`        | 型チェック→Lint→整形検査→テスト→ビルド。最初の失敗で停止 |
 
 変更ファイルだけの検査を全体の合格にしません。依存不整合なら検証中に自動導入せず、install段階へ戻ります。
+
+## Lintの方針
+
+- TypeScriptは`strictTypeChecked`＋`stylisticTypeChecked`で検査します。非null断定（`value!`）・不要な条件・危険な型操作などを検出し、`import type`の書き方を揃えます。any・Promiseの待ち忘れ検出は維持します。
+- 不要になったeslint-disableコメントはerrorです。スタイルの細部はPrettierへ任せ、整形とLintの競合ルールを無効化します。
+- Vitestの推奨検査を実行対象のテストに適用し、focused test（.only）・disabled test（.skip等）をerrorにします。.onlyをLintの--fixで勝手に除去する設定にはしません。テストのunsafe検査を一括offにはしません。
+- 正規表現は推奨ルールで、重複した選択肢・誤用・不必要な記述等を検査します。
+- Nodeで実行するコードは、対象プロジェクトのpackage.jsonのengines.nodeに基づく静的Node API検査を行います。実験的APIは明示的な採用判断なしに許可しません。この検査はpluginの対応表で分かる静的APIに限られ、instance method・追加引数・全optionsの互換性を保証するものではありません。
+- アプリ内部の関数すべてに明示的な戻り値型を強制する設定にはしていません。
+
+固定plugin版は`@vitest/eslint-plugin 1.6.27`、`eslint-plugin-n 18.4.1`、`eslint-plugin-regexp 3.3.1`です。ルール強化により、以前通っていたコードが不合格になる場合があります。エラーの理由を確認して修正し、検査を一括offにして回避しません。
+
+参考にした実設定:
+
+- [Josh Goldberg / create-typescript-app](https://github.com/JoshuaKGoldberg/create-typescript-app/blob/9bbf2385f495b912b306d66c8d2118ab340e4c4c/eslint.config.ts)
+- [typescript-eslint自身の設定](https://github.com/typescript-eslint/typescript-eslint/blob/76786e8adbfe937fb49130d7930d21d5479389d6/eslint.config.mjs)
+
+作者の設定を丸ごと複製したものではなく、公式プリセット/APIと必要なルールを組み合わせ、既存の用途・安全境界へ適合させています。
 
 ## 4. 既存Gitフックを確認し、許可後に有効化する
 

@@ -62,6 +62,7 @@ export async function copyPreset(
     const installed = runAt(root, "pnpm", [
       "install",
       "--ignore-scripts",
+      "--engine-strict",
       "--store-dir",
       join(verification, "pnpm-store"),
     ]);
