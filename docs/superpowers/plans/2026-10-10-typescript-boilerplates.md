@@ -1,5 +1,7 @@
 # TypeScript Boilerplates Implementation Plan
 
+> 履歴資料: この文書は初期構成（共通設定＋presets）の記録です。自己完結型への移行後の現在の配置・導入手順は、[TypeScript README](../../../typescript/README.md)と用途別READMEを参照してください。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 3用途のTypeScript設定とScaffold向けREADMEを作り、PublicリポジトリとDevelopmentの言語別表を接続します。

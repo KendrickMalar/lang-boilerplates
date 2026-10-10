@@ -1,5 +1,7 @@
 # lang-boilerplates TypeScript設定 — 設計
 
+> 履歴資料: この文書は初期構成（共通設定＋presets）の記録です。自己完結型への移行後の現在の配置・導入手順は、[TypeScript README](../../../typescript/README.md)と用途別READMEを参照してください。
+
 > 作成日・最終更新: 2026-10-10
 > 出所: ユーザーとの要件整理、TypeScript・typescript-eslint・Huskyの公式文書、npm registryのパッケージmetadata。
 > 目的: Scaffoldが言語別READMEを入口に、用途に合う設定を新規プロジェクトへ安全に導入できるようにします。

@@ -1,41 +1,55 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join } from "node:path";
 import { ROOT } from "./helpers.mjs";
-test("language README links resolve to the complete settings distribution", () => {
-  const doc = join(ROOT, "typescript/README.md");
-  assert.ok(existsSync(doc), "missing Scaffold TypeScript README");
-  const text = readFileSync(doc, "utf8");
-  const linked = new Set(
-    [...text.matchAll(/\]\(\.\/([^\s)#]+)\)/g)].map((match) => match[1]),
-  );
-  for (const relative of linked)
+
+test("language entry links to all standalone README files", () => {
+  const entry = readFileSync(join(ROOT, "typescript/README.md"), "utf8");
+  for (const name of ["node", "web", "library"]) {
     assert.ok(
-      existsSync(join(dirname(doc), relative)),
-      "missing link: " + relative,
-    );
-  function walk(dir) {
-    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
-      entry.isDirectory()
-        ? walk(join(dir, entry.name))
-        : [join(dir, entry.name)],
+      entry.includes("./" + name + "/README.md"),
+      "missing language entry: " + name,
     );
   }
-  const distributed = walk(join(ROOT, "typescript")).filter(
-    (path) => !path.endsWith("README.md"),
-  );
-  for (const path of distributed)
+});
+test("each leaf README describes only its own complete distribution", () => {
+  for (const name of ["node", "web", "library"]) {
+    const dir = join(ROOT, "typescript", name);
+    const text = readFileSync(join(dir, "README.md"), "utf8");
+    const targets = [...text.matchAll(/\]\(([^\s)#]+)\)/g)]
+      .map((match) => match[1])
+      .filter((path) => !/^https?:\/\//.test(path));
     assert.ok(
-      linked.has(path.slice(join(ROOT, "typescript").length + 1)),
-      "unlisted copy file: " + path,
+      targets.every((path) => path.startsWith("./") && !path.includes("..")),
+      name + " uses another directory",
     );
-  assert.ok(
-    !distributed.some(
-      (path) =>
-        /\/(src|node_modules|_)\//.test(path) ||
-        path.endsWith(".test.ts") ||
-        path.endsWith("index.html"),
-    ),
-  );
+    const linked = new Set(targets.map((path) => path.slice(2)));
+    for (const relative of linked)
+      assert.ok(
+        existsSync(join(dir, relative)),
+        name + " missing link: " + relative,
+      );
+    function walk(path) {
+      return readdirSync(path, { withFileTypes: true }).flatMap((entry) =>
+        entry.isDirectory()
+          ? walk(join(path, entry.name))
+          : [join(path, entry.name)],
+      );
+    }
+    for (const file of walk(dir).filter(
+      (path) => !path.endsWith("README.md"),
+    )) {
+      assert.ok(
+        linked.has(file.slice(dir.length + 1)),
+        name + " unlisted file: " + file,
+      );
+      assert.ok(
+        !/\/(src|node_modules|_)\//.test(file) &&
+          !file.endsWith(".test.ts") &&
+          !file.endsWith("index.html"),
+        file,
+      );
+    }
+  }
 });

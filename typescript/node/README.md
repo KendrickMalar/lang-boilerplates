@@ -1,0 +1,94 @@
+# TypeScript Node／CLI Boilerplate
+
+Nodeアプリ／CLI向けの設定一式です。NodeNextで解決し、製品srcだけをdistへ出力します。DOM型は含めません。開発時は`pnpm dev`でtsxを使います。CLIのentryが決まった後にbinと実行権限を別途設定してください。
+
+このディレクトリだけで設定が完結します。以下のパスは**このREADMEからの相対パス**です。親・兄弟の設定ファイルには依存しません。pnpm 12.6.0、Node 24以上、ESMが前提です。
+
+## 1. 設定を確認・コピーする
+
+表のファイルを対象プロジェクトのルートへ導入します。ドットファイルと.husky内のフックも含みます。READMEは導入手順として読み、コピーは任意です。既存ファイル・symlink・既存.huskyがある場合は停止し、差分と影響を提示して許可を得てください。既存package.jsonやpnpm-workspace.yamlを丸ごと上書きせず、必要な差分を統合します。
+
+| 同じディレクトリのコピー元                         | コピー先（対象プロジェクトのルート基準） |
+| -------------------------------------------------- | ---------------------------------------- |
+| [package.json](./package.json)                     | `package.json`                           |
+| [tsconfig.base.json](./tsconfig.base.json)         | `tsconfig.base.json`                     |
+| [tsconfig.json](./tsconfig.json)                   | `tsconfig.json`                          |
+| [eslint.base.mjs](./eslint.base.mjs)               | `eslint.base.mjs`                        |
+| [eslint.config.mjs](./eslint.config.mjs)           | `eslint.config.mjs`                      |
+| [.prettierrc.json](./.prettierrc.json)             | `.prettierrc.json`                       |
+| [.prettierignore](./.prettierignore)               | `.prettierignore`                        |
+| [.editorconfig](./.editorconfig)                   | `.editorconfig`                          |
+| [.gitignore](./.gitignore)                         | `.gitignore`                             |
+| [.node-version](./.node-version)                   | `.node-version`                          |
+| [lint-staged.config.mjs](./lint-staged.config.mjs) | `lint-staged.config.mjs`                 |
+| [pnpm-workspace.yaml](./pnpm-workspace.yaml)       | `pnpm-workspace.yaml`                    |
+| [vitest.config.ts](./vitest.config.ts)             | `vitest.config.ts`                       |
+| [tsconfig.build.json](./tsconfig.build.json)       | `tsconfig.build.json`                    |
+| [.husky/pre-commit](./.husky/pre-commit)           | `.husky/pre-commit`                      |
+| [.husky/pre-push](./.husky/pre-push)               | `.husky/pre-push`                        |
+| [LICENSE](./LICENSE)                               | `LICENSE.lang-boilerplates`              |
+
+設定はMITです。ライセンス文・著作権表示を保持してください。LICENSEは既存ライセンスを上書きしないよう、例えばLICENSE.lang-boilerplatesとして保存します。利用プロジェクト自身のライセンスを自動変更しません。
+
+製品コード・サンプルテスト・HTMLは配布しません。利用側でsrcとtests/**/*.test.tsを用意してください。設定だけをコピーした状態やテストなしを検証合格にしません。フレームワーク生成済みなら既存設定を優先し、差分を確認します。
+
+## 2. package.jsonと依存を整える
+
+- nameを製品名に変更します。既存package.jsonではscripts/devDependenciesの差分を確認します。
+- type:moduleは既存CJSコードの意味を変えます。黙って適用しません。
+- TypeScript 6.0.3、typescript-eslint 8.71.1を固定しています。TypeScript 7はこのLint版の対応範囲外です。一括更新せずpeer要件と検証を確認します。
+- Node型定義は24系です。下限より新しいAPIを無条件に許容しません。
+
+対象と導入許可を確認してから、対象プロジェクトのrootで実行します。
+
+```sh
+pnpm install --ignore-scripts
+```
+
+生成したpnpm-lock.yamlをGitで管理します。prepare/postinstallによるHuskyの自動有効化はありません。pnpmの検証時自動installは禁止、公開24時間未満の依存は拒否、未承認の依存build scriptはエラーにします。現在のesbuild@0.28.2はinstall scriptを不許可とし、optional binaryを使います。エラーを勝手な例外追加や全script許可で回避しません。
+
+## 3. 製品コードとテストを用意して検証する
+
+| コマンド            | 内容                                                     |
+| ------------------- | -------------------------------------------------------- |
+| `pnpm typecheck`    | src・テスト・TS設定の型チェック                          |
+| `pnpm lint`         | 型情報Lint。warningも不合格                              |
+| `pnpm format`       | 整形適用                                                 |
+| `pnpm format:check` | 整形検査                                                 |
+| `pnpm test`         | Vitestを1回実行。テストなしは不合格                      |
+| `pnpm build`        | 製品ビルド                                               |
+| `pnpm check`        | 型チェック→Lint→整形検査→テスト→ビルド。最初の失敗で停止 |
+
+変更ファイルだけの検査を全体の合格にしません。依存不整合なら検証中に自動導入せず、install段階へ戻ります。
+
+## 4. 既存Gitフックを確認し、許可後に有効化する
+
+設定コピー・依存導入だけではフックは有効になりません。Git root、既存core.hooksPath、その指すフック、Git共通ディレクトリのhooks、既存.huskyを確認します。
+
+```sh
+git rev-parse --show-toplevel
+git rev-parse --git-common-dir
+git config --show-origin --get core.hooksPath
+```
+
+未設定時の最後のexit 1は未設定を表します。.sampleは有効フックではありません。既存フックや別hooksPathがある場合、今回コピーしたもの以外の.huskyがある場合、プロジェクトがGit rootと異なる場合は停止し、統合方針を別途確認します。グローバルフックを変更しません。
+
+条件とプロジェクトローカルGit設定変更の許可が揃った場合だけ、Git rootで実行します。
+
+```sh
+pnpm exec husky
+```
+
+これはローカルcore.hooksPathを変更し、.husky/_に内部ファイルを生成します。**.husky/_はGitへ追加せず、設定として配布する.husky/pre-commitと.husky/pre-pushはGitで管理します。** husky initによる既存フックの上書きは行いません。
+
+commit前は変更ファイルの整形・Lint、push前はpnpm checkを実行し、不合格なら停止します。有効化後は許可されたローカルGit操作で検証し、設定と結果を読み戻します。テスト目的だけでGitHubへpushしません。
+
+HuskyにはCIと同じ強制力はありません。未設定端末・GitHub上の直接編集・hookスキップでは保証できません。不合格をスキップで回避せず、実行結果と有効化状態を記録します。
+
+## 公式資料
+
+- https://www.typescriptlang.org/tsconfig/
+- https://typescript-eslint.io/getting-started/typed-linting
+- https://typicode.github.io/husky/how-to.html
+- https://pnpm.io/settings/build
+- https://pnpm.io/settings/dependency-resolution
