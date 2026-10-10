@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- GitHub先はKendrickMalar/lang-boilerplates、Public、MIT。ローカル正本は `/Users/papillon/Documents/Github/lang-boilerplates`、作業は `/Users/papillon/.config/superpowers/worktrees/lang-boilerplates/typescript-config` のfeat/typescript-configだけです。
+- GitHub先はKendrickMalar/lang-boilerplates、Public、MIT。作業はこのリポジトリの専用feature worktree、feat/typescript-configだけです。
 - 配布物は設定とREADMEのみ。製品src、サンプルテスト、HTMLエントリはtypescript/へ置きません。
 - pnpm 12.6.0、ESM、Node >=24。下限未検証ならその旨を報告します。OSのNode/pnpmは変更しません。
 - 初期版: typescript 6.0.3、eslint 10.12.0、@eslint/js 10.0.1、typescript-eslint 8.71.1、globals 17.13.0、prettier 3.9.9、eslint-config-prettier 10.1.8、husky 9.1.7、lint-staged 17.6.0、vitest 5.0.3、vite 8.3.4、tsx 4.23.15、@types/node 24.19.1。
@@ -92,7 +92,7 @@
 ### Task 4: 公開とDevelopmentのREADMEリンク
 
 **Files:**
-- Modify: `/Users/papillon/.pi/agent/profiles/development/skills/scaffold/references/basic-design.md` のTypeScriptテーブル行のみ。
+- Modify: `~/.pi/agent/profiles/development/skills/scaffold/references/basic-design.md` のTypeScriptテーブル行のみ。
 - Create: 必要な検証・公開記録（機密情報を含めない）。
 
 **Interfaces:**

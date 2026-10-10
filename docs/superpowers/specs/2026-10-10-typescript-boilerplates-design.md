@@ -83,7 +83,7 @@ typescript/
 
 ### scriptsとhooks
 
-- typecheck: `tsc --noEmit`
+- typecheck: Node/libraryは `tsc --noEmit`、Webは `tsc -b --noEmit`
 - lint: `eslint . --max-warnings 0`
 - format: `prettier . --write`
 - format:check: `prettier . --check`

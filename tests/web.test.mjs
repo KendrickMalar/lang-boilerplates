@@ -17,5 +17,10 @@ test("web product rejects Node globals in both typecheck and lint", async () => 
     "export const platform = process.platform;\n",
   );
   await expectResult(root, ["typecheck"], 1, /process/);
-  await expectResult(root, ["lint"], 1, /no-unsafe-assignment|no-unsafe-member-access/);
+  await expectResult(
+    root,
+    ["lint"],
+    1,
+    /no-unsafe-assignment|no-unsafe-member-access/,
+  );
 });
