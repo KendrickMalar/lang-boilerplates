@@ -1,27 +1,9 @@
-import {
-  mkdir,
-  mkdtemp,
-  copyFile,
-  readdir,
-  writeFile,
-  access,
-} from "node:fs/promises";
+import { mkdir, mkdtemp, cp, writeFile } from "node:fs/promises";
 import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-export const COMMON = [
-  "tsconfig.base.json",
-  "eslint.base.mjs",
-  ".prettierrc.json",
-  ".prettierignore",
-  ".editorconfig",
-  ".gitignore",
-  ".node-version",
-  "lint-staged.config.mjs",
-  "pnpm-workspace.yaml",
-];
 const verification = join(ROOT, ".verification");
 let serial = 0;
 export function runAt(root, command, args = [], extraEnv = {}) {
@@ -69,24 +51,13 @@ export async function copyPreset(
 ) {
   await mkdir(join(verification, "fixtures"), { recursive: true });
   await mkdir(join(verification, "home"), { recursive: true });
-  const root = await mkdtemp(join(verification, "fixtures", name + "-"));
-  for (const file of COMMON)
-    await copyFile(join(ROOT, "typescript", file), join(root, file));
-  for (const file of await readdir(join(ROOT, "typescript", "presets", name)))
-    await copyFile(
-      join(ROOT, "typescript", "presets", name, file),
-      join(root, file),
-    );
-  for (const hook of ["pre-commit", "pre-push"]) {
-    const source = join(ROOT, "typescript", ".husky", hook);
-    try {
-      await access(source);
-    } catch {
-      continue;
-    }
-    await mkdir(join(root, ".husky"), { recursive: true });
-    await copyFile(source, join(root, ".husky", hook));
-  }
+  const container = await mkdtemp(join(verification, "fixtures", name + "-"));
+  const root = join(container, basename(container));
+  await cp(join(ROOT, "typescript", name), root, {
+    recursive: true,
+    force: false,
+    errorOnExist: true,
+  });
   if (dependencies) {
     const installed = runAt(root, "pnpm", [
       "install",
