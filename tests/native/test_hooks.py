@@ -44,7 +44,7 @@ def copy_check_script(leaf, root):
 class HookContractTests(unittest.TestCase):
     def test_hooks_executable_and_empty_project_fails_without_install(self):
         CACHE.mkdir(parents=True, exist_ok=True)
-        for leaf in ['rust/tauri', 'swift/macos', 'swift/ios']:
+        for leaf in ['rust/tauri', 'swift/macos', 'swift/ios', 'roblox/rojo']:
             for hook in ['pre-commit', 'pre-push']:
                 with self.subTest(leaf=leaf, hook=hook):
                     source = ROOT / leaf / '.githooks' / hook
@@ -60,7 +60,7 @@ class HookContractTests(unittest.TestCase):
                     self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_documented_opt_in_preserves_existing_hooks(self):
-        for leaf in ['rust/tauri', 'swift/macos', 'swift/ios']:
+        for leaf in ['rust/tauri', 'swift/macos', 'swift/ios', 'roblox/rojo']:
             text = (ROOT / leaf / 'README.md').read_text()
             for command in ['git config --show-origin --get-all core.hooksPath',
                             'git rev-parse --git-path hooks',
@@ -142,6 +142,8 @@ def exercise_git_gates(test: unittest.TestCase, platform: str, inputs):
             test.assertIn('stage: ' + stage, output)
         if platform == 'rust':
             test.assertIn('1 passed', output)
+        elif platform == 'roblox':
+            test.assertIn('1 passed, 0 failed', output)
         else:
             test.assertRegex(output, r'"passedTests"\s*:\s*1')
         def remote_head():
@@ -151,7 +153,7 @@ def exercise_git_gates(test: unittest.TestCase, platform: str, inputs):
         run(['add', '--', str(source.relative_to(root))])
         run(['commit', '-qm', 'bad format'], success=False)
         output = receipts[-1]['stdout'] + receipts[-1]['stderr']
-        test.assertIn('Diff in' if platform == 'rust' else '[Spacing]', output)
+        test.assertIn('[Spacing]' if platform in ('macos', 'ios') else 'Diff in', output)
         test.assertNotIn('stage: lint', output)
         test.assertEqual(run(['rev-parse', 'HEAD']), head)
         source.write_bytes(original_source)
@@ -164,7 +166,8 @@ def exercise_git_gates(test: unittest.TestCase, platform: str, inputs):
         test.assertNotEqual(bad_head, head)
         run(['push', str(remote), 'HEAD:refs/heads/fixture'], success=False)
         output = receipts[-1]['stdout'] + receipts[-1]['stderr']
-        test.assertIn('test result: FAILED' if platform == 'rust' else 'FixtureTests.testAddition()', output)
+        test.assertIn({'rust': 'test result: FAILED', 'roblox': 'FAIL tests/Greeting.spec.luau'}
+                      .get(platform, 'FixtureTests.testAddition()'), output)
         test.assertNotIn('stage: build', output)
         test.assertEqual(run(['rev-parse', 'HEAD']), bad_head)
         test.assertEqual(remote_head(), head)
@@ -246,6 +249,23 @@ class MacOSHookTests(unittest.TestCase):
 
 class IOSHookTests(MacOSHookTests):
     platform = 'ios'
+
+
+class RobloxHookTests(unittest.TestCase):
+    platform = 'roblox'
+
+    def test_real_commit_push_gates_and_global_preservation(self):
+        self.assertTrue((ROOT / 'roblox/rojo/.githooks/pre-commit').is_file(), 'manual hook missing')
+        exercise_git_gates(self, self.platform, self.fixture_inputs())
+
+    def fixture_inputs(self):
+        from tests.native.roblox_helpers import GREETING_SPEC, copy_fixture, roblox_env
+        root = copy_fixture('hooks')
+        copy_check_script('roblox/rojo', root)
+        source = root / 'src/shared/Greeting.luau'
+        tests = root / 'tests/Greeting.spec.luau'
+        return (root, roblox_env(root), source, tests, 'local Greeting={}\nreturn Greeting\n',
+                GREETING_SPEC.replace('"Hello, Roblox!"', '"Bye"'))
 
 
 if __name__ == '__main__':

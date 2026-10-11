@@ -20,6 +20,11 @@ SWIFT_FILES = {'README.md', 'LICENSE', '.swift-format', '.swiftlint.yml',
                'Config/Debug.xcconfig', 'Config/Release.xcconfig',
                'Config/VerifyUnsigned.xcconfig', 'scripts/check.sh',
                '.githooks/pre-commit', '.githooks/pre-push'}
+ROBLOX_FILES = {'README.md', 'LICENSE', '.editorconfig', '.gitignore', 'rokit.toml',
+                'default.project.json', 'wally.toml', 'stylua.toml', 'selene.toml', '.luaurc',
+                'src/server/.gitkeep', 'src/client/.gitkeep', 'src/shared/.gitkeep',
+                'tests/.gitkeep', 'scripts/check.sh', 'scripts/test.luau',
+                '.githooks/pre-commit', '.githooks/pre-push'}
 
 
 def links(path):
@@ -29,7 +34,8 @@ def links(path):
 
 class CatalogTests(unittest.TestCase):
     def test_root_language_leaf_navigation(self):
-        for language, leaves in [('rust', ['tauri']), ('swift', ['macos', 'ios'])]:
+        for language, leaves in [('rust', ['tauri']), ('swift', ['macos', 'ios']),
+                                 ('roblox', ['rojo'])]:
             self.assertIn(f'./{language}/README.md', links(ROOT / 'README.md'))
             for leaf in leaves:
                 self.assertIn(f'{leaf}/README.md', links(ROOT / language / 'README.md'))
@@ -39,7 +45,7 @@ class CatalogTests(unittest.TestCase):
         cache = ROOT / '.verification/native/catalog'
         cache.mkdir(parents=True, exist_ok=True)
         for name, expected in [('rust/tauri', RUST_FILES), ('swift/macos', SWIFT_FILES),
-                               ('swift/ios', SWIFT_FILES)]:
+                               ('swift/ios', SWIFT_FILES), ('roblox/rojo', ROBLOX_FILES)]:
             with self.subTest(leaf=name):
                 source = ROOT / name
                 actual = {p.relative_to(source).as_posix() for p in source.rglob('*') if p.is_file()}
@@ -66,11 +72,13 @@ class CatalogTests(unittest.TestCase):
         scripts = json.loads((ROOT / 'package.json').read_text())['scripts']
         self.assertEqual(scripts['test'], 'node --version && pnpm test:static && pnpm test:integration')
         for name, module in [('static', 'test_catalog'), ('rust', 'test_rust'),
-                             ('macos', 'test_swift_macos'), ('ios', 'test_swift_ios')]:
+                             ('macos', 'test_swift_macos'), ('ios', 'test_swift_ios'),
+                             ('roblox', 'test_roblox')]:
             self.assertIn(f'test:native:{name}', scripts)
             self.assertIn(module, scripts[f'test:native:{name}'])
             self.assertNotIn('discover', scripts[f'test:native:{name}'])
             self.assertIn('tests.native.test_catalog', scripts[f'test:native:{name}'])
+        self.assertIn('test_static_roblox', scripts['test:native:static'])
 
 
 class CatalogRunnerTests(unittest.TestCase):
