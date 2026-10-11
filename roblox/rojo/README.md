@@ -83,7 +83,8 @@ sh scripts/check.sh format # format|lint|typecheck|test|build|all
 ## テスト
 
 `tests/**/*.spec.luau` は `{ [テスト名]: () -> () }` のテーブルを返します。
-error を投げたテストは失敗です。テーブル以外を返す spec や読込みエラーも失敗に数えます。
+error を投げたテストは失敗です。テーブル以外を返す spec、読込みエラー、空のテーブル、
+文字列以外のテスト名、関数以外の値も失敗に数えます（ファイル名を表示し、他の spec は続けて実行します）。
 
 ```lua
 local Greeting = require("../src/shared/Greeting")

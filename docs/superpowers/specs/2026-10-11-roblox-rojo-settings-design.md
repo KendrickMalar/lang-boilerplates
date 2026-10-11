@@ -91,7 +91,8 @@ roblox/
 - `roblox.yml`（Selene の Roblox 定義）: 利用者が `selene generate-roblox-std` で一度だけ生成し、製品 Git で管理します。雛形には同梱しません。floating（既定）だと6時間ごとに自動ダウンロードされ、結果が再現できないためです（2026-10-11 改訂）。
 - `.luaurc`: `languageMode = "strict"`。
 - `wally.toml`: 依存は空、`realm = "shared"`、registry は公式の `UpliftGames/wally-index`。
-- `.gitignore`: `Packages/`、`sourcemap.json`、`*.rbxl`、`*.rbxlx`、`.luau-lsp-cache/`。`wally.lock` は Git 管理します。
+- `.gitignore`: `Packages/`、`sourcemap.json`、`*.rbxl`、`*.rbxlx`、`.luau-lsp-cache/`。既存 leaf（Rust/Swift）に揃え `/.verification/` と `.DS_Store` も含めます（2026-10-11 改訂）。`wally.lock` と `roblox.yml` は Git 管理します。
+- テスト実行器: 読込みエラー、テーブル以外、空テーブル、文字列以外のテスト名、関数以外の値を、ファイル名つきの失敗として数えます（2026-10-11 改訂）。
 
 ### 3.4 型定義
 
