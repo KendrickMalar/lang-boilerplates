@@ -201,6 +201,7 @@
 - 事前準備（ユーザー承認済み）: Rokit 1.2.0 を `~/.rokit` に導入、6ツールを `rokit install`。Wally 0.3.2 は x86_64 のみのため、ユーザーが Rosetta 2 を導入。
 - seed（Git 管理外）: `.verification/native/roblox/seed/`（roblox.yml、型定義 SHA256 一致、facts.md）。
 - TDD: static 7件 RED → GREEN、runtime 15件 RED(14) → GREEN、hook 3件 RED → GREEN。
-- 結果: native static 19 tests OK、native roblox 16 tests OK（正常 all、整形/Lint/strict 型/失敗 spec/非 table spec/0件/欠落 path/tool 不在/版違い/型定義 SHA 不一致/Packages 欠落/roblox.yml 欠落/空 src/未知 stage、ローカル bare remote への実 commit/push）。
+- 最終レビュー（ブランチ全体を独立レビュー）の指摘で、次の4点を修正（`9b6bc68`）: seed 不在時の案内、rokit.toml の読めない行で停止、wally.toml のコメントやインデントを許容、server/dev 依存で停止。
+- 結果: native static 19 tests OK、native roblox 20 tests OK（正常 all、整形/Lint/strict 型/失敗 spec/非 table spec/0件/欠落 path/tool 不在/版違い/型定義 SHA 不一致/Packages 欠落/roblox.yml 欠落/空 src/未知 stage、ローカル bare remote への実 commit/push）。
 - `pnpm test:native:*` は ERR_PNPM_VERIFY_DEPS_BEFORE_RUN（依存未導入）で起動せず、同一の python コマンドを直接実行。guard は回避していない。`pnpm test`（TypeScript）は未実行。
 - 未検証: Roblox Studio 実同期、Windows/Linux、Wally レジストリからの実取得、Rust/Swift runtime suite の再実行。
