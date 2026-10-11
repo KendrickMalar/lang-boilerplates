@@ -87,7 +87,8 @@ roblox/
 ### 3.3 品質設定
 
 - `stylua.toml`: `syntax = "Luau"`、列幅 120、タブ、`AutoPreferDouble`、`call_parentheses = "Always"`。
-- `selene.toml`: `std = "roblox"`。Selene 0.30 以降は Roblox 上の文字列 require を受け付けます。
+- `selene.toml`: `std = "roblox"`、`roblox-std-source = "pinned"`。Selene 0.30 以降は Roblox 上の文字列 require を受け付けます。
+- `roblox.yml`（Selene の Roblox 定義）: 利用者が `selene generate-roblox-std` で一度だけ生成し、製品 Git で管理します。雛形には同梱しません。floating（既定）だと6時間ごとに自動ダウンロードされ、結果が再現できないためです（2026-10-11 改訂）。
 - `.luaurc`: `languageMode = "strict"`。
 - `wally.toml`: 依存は空、`realm = "shared"`、registry は公式の `UpliftGames/wally-index`。
 - `.gitignore`: `Packages/`、`sourcemap.json`、`*.rbxl`、`*.rbxlx`、`.luau-lsp-cache/`。`wally.lock` は Git 管理します。
@@ -103,12 +104,12 @@ roblox/
 
 ### 4.1 check.sh
 
-`scripts/check.sh [all|fmt|lint|typecheck|test|build]`。省略時は `all` です。最初の失敗で止まり、非0を返します。
+`scripts/check.sh [all|format|lint|typecheck|test|build]`。省略時は `all` です。最初の失敗で止まり、非0を返します。
 
 | 段階 | コマンド |
 | --- | --- |
 | 事前確認 | rokit.toml の各ツールが PATH にあり、`--version` が一致するか |
-| fmt | `stylua --check src tests scripts` |
+| format | `stylua --check src tests scripts` |
 | lint | `selene src tests scripts` |
 | typecheck | `rojo sourcemap default.project.json -o sourcemap.json` → 型定義の取得・照合 → `luau-lsp analyze --platform=roblox --sourcemap=sourcemap.json --definitions=<型定義> --ignore="Packages/**" src tests` |
 | test | `lune run scripts/test.luau` |
@@ -120,7 +121,8 @@ roblox/
 - `src` 配下に `.luau` が1つもない
 - `wally.toml` に依存があるのに `Packages/` が無い（「`wally install` を実行してください」と案内）
 - テストが0件
-- 型定義の SHA が一致しない
+- 型定義の SHA が一致しない（キャッシュ済みファイルも毎回照合）
+- `roblox.yml` が無い（「`selene generate-roblox-std` を実行してください」と案内）
 
 自動でツールや依存を導入しません。外部へ接続するのは、型定義の初回取得だけです。
 
@@ -130,7 +132,7 @@ Lune 用の最小のテスト実行器です。`tests/` 配下の `*.spec.luau` 
 
 ### 4.3 Git フック
 
-- `pre-commit`: `check.sh fmt` と `check.sh lint`
+- `pre-commit`: `check.sh format` と `check.sh lint`
 - `pre-push`: `check.sh all`
 - コピーだけでは有効になりません。利用者が README の手順で `git config core.hooksPath .githooks` を実行します。既存フックがある場合は、先に内容を確認するよう README に書きます。
 
@@ -149,7 +151,7 @@ Lune 用の最小のテスト実行器です。`tests/` 配下の `*.spec.luau` 
 | 種類 | 入力 | 期待 |
 | --- | --- | --- |
 | 正常系 | 純粋ロジック1つ＋spec 1つ | `all` が 0 |
-| 異常系 | 整形崩れ | fmt で非0 |
+| 異常系 | 整形崩れ | format で非0 |
 | 異常系 | 未使用変数など Selene 警告 | lint で非0 |
 | 異常系 | strict の型エラー | typecheck で非0 |
 | 異常系 | 失敗する spec | test で非0 |
@@ -158,6 +160,7 @@ Lune 用の最小のテスト実行器です。`tests/` 配下の `*.spec.luau` 
 | 異常系 | ツール不在・版違い | 事前確認で非0 |
 | 異常系 | 型定義の SHA 不一致 | typecheck で非0 |
 | 異常系 | 依存ありで `Packages/` 無し | 事前確認で非0 |
+| 異常系 | `roblox.yml` 無し | 事前確認で非0 |
 | フック | 整形崩れを commit | pre-commit で拒否 |
 | フック | 型エラーを push | pre-push で拒否 |
 
@@ -201,3 +204,4 @@ Studio への実同期、Windows/Linux、Wally レジストリからの実取得
 | --- | --- |
 | 2026-10-11 | Rojo でファイル管理、Rokit、6ツール全採用、空ディレクトリのみ、実ツール検証、check.sh 方式を決定 |
 | 2026-10-11 | `.luau-lsp.json` を設計から削除し、analyze 引数を check.sh に集約 |
+| 2026-10-11 | Selene の Roblox 定義を pinned（`roblox.yml` を利用者が生成・Git 管理）に変更。段階名 `fmt` を既存 leaf に合わせ `format` に変更 |
