@@ -1,9 +1,11 @@
 """Real Rokit-pinned tools against isolated fixtures: normal passes, each defect fails."""
+import hashlib
 import unittest
 from unittest.mock import patch
 
 from tests.native import roblox_helpers
 from tests.native.roblox_helpers import copy_fixture, roblox_env, run_check
+from tests.native.test_static_roblox import DEFS_SHA
 
 
 class RobloxCheckTests(unittest.TestCase):
@@ -52,6 +54,39 @@ class RobloxCheckTests(unittest.TestCase):
         root = copy_fixture("notable")
         (root / "tests/Broken.spec.luau").write_text("return 1\n")
         self.assert_fails(run_check(root, "test"), "Broken.spec.luau")
+
+    def test_spec_load_error_is_reported_per_file(self):
+        root = copy_fixture("loaderror")
+        (root / "tests/Loader.spec.luau").write_text('error("boom")\n')
+        self.assert_fails(run_check(root, "test"), "FAIL tests/Loader.spec.luau", "boom",
+                          "PASS tests/Greeting.spec.luau")
+
+    def test_non_string_test_names_fail_without_crashing(self):
+        root = copy_fixture("numeric")
+        (root / "tests/Numeric.spec.luau").write_text(
+            'return {\n\tfunction() end,\n\t["named"] = function() end,\n}\n')
+        self.assert_fails(run_check(root, "test"), "FAIL tests/Numeric.spec.luau", "string",
+                          "PASS tests/Greeting.spec.luau", "2 passed, 1 failed")
+
+    def test_non_function_test_case_fails(self):
+        root = copy_fixture("nonfunction")
+        (root / "tests/Value.spec.luau").write_text('return {\n\t["not a function"] = 1,\n}\n')
+        self.assert_fails(run_check(root, "test"), "FAIL tests/Value.spec.luau :: not a function")
+
+    def test_empty_spec_table_fails_even_with_other_tests(self):
+        root = copy_fixture("emptyspec")
+        (root / "tests/Empty.spec.luau").write_text("return {}\n")
+        self.assert_fails(run_check(root, "test"), "FAIL tests/Empty.spec.luau", "no tests")
+
+    def test_type_definitions_download_and_verify(self):
+        # Network: fetches the pinned luau-lsp 1.69.0 definitions (approved source).
+        root = copy_fixture("download")
+        cached = root / ".luau-lsp-cache/globalTypes-1.69.0.d.luau"
+        cached.unlink()
+        result = run_check(root, "typecheck")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(hashlib.sha256(cached.read_bytes()).hexdigest(), DEFS_SHA)
+        self.assertEqual(list(cached.parent.glob("*.tmp.*")), [])
 
     def test_zero_specs(self):
         root = copy_fixture("zero")

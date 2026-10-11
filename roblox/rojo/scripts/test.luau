@@ -36,7 +36,16 @@ for _, file in files do
 	end
 	local names = {}
 	for name in suite do
-		table.insert(names, name)
+		if type(name) == "string" then
+			table.insert(names, name)
+		else
+			failed += 1
+			print(`FAIL {file} :: {name}: test names must be strings`)
+		end
+	end
+	if next(suite) == nil then
+		failed += 1
+		print(`FAIL {file}: no tests in spec`)
 	end
 	table.sort(names)
 	for _, name in names do

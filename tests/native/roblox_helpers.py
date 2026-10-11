@@ -35,7 +35,8 @@ return {
 def tool_bin_dir() -> Path:
     """Link pinned binaries from Rokit storage so a synthetic HOME cannot break shims."""
     pins = tomllib.loads((LEAF / "rokit.toml").read_text())["tools"]
-    # Rokit stores tools as <owner>/<repo>/<version>/<binary>, lowercased.
+    # Rokit 1.2.0 internal layout: <owner>/<repo>/<version>/<binary>, lowercased.
+    # Not a public contract; re-check after upgrading Rokit if this raises.
     storage = Path.home() / ".rokit/tool-storage"
     bin_dir = CACHE / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
