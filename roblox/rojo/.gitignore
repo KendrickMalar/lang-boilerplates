@@ -1,0 +1,8 @@
+/Packages/
+/sourcemap.json
+*.rbxl
+*.rbxlx
+/.luau-lsp-cache/
+/.verification/
+.DS_Store
+# wally.lock and roblox.yml belong in the consuming project repository.

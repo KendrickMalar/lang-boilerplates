@@ -9,6 +9,7 @@ Scaffoldでプロジェクトを作る際に参照する、言語別の設定と
 | TypeScript | [typescript/README.md](./typescript/README.md) |
 | Rust | [rust/README.md](./rust/README.md) |
 | Swift | [swift/README.md](./swift/README.md) |
+| Roblox (Luau) | [roblox/README.md](./roblox/README.md) |
 
 Scaffoldは言語を選んだ後、当該言語のREADMEを読み、参照された設定ファイルと導入条件を確認します。各用途は親/兄弟設定に依存せず自己完結します。
 
@@ -35,6 +36,7 @@ suite を自動導入/自動実行しません。tool や依存は対象・保�
 pnpm test:native:static
 pnpm test:native:rust
 pnpm test:native:macos
+pnpm test:native:roblox
 NATIVE_IOS_TEST_DESTINATION='platform=iOS Simulator,id=APPROVED-UUID' pnpm test:native:ios
 ```
 
@@ -62,6 +64,7 @@ iOS27.0 iPhone17/iPad(A16) Simulator app test/build です。Package-only/mock �
 - TypeScript: Node/CLI、汎用Web、npmライブラリ。
 - Rust: Tauri desktop の backend のみ（Rust1.92.0/edition2024/Tauri2.12.2/tauri-build2.7.1）。frontend は利用側で接続。
 - Swift: 標準 Xcode app 用、Swift6 mode/macOS15/iOS17/SwiftLint0.65.1。xcconfig の実効接続を確認。
+- Roblox: Rojo でファイル管理するゲーム用（Rojo7.7.1/StyLua2.5.2/Selene0.32.0/luau-lsp1.69.0/Lune0.10.5/Wally0.3.2 を Rokit で固定）。macOS 実検証、Studio 実同期は未検証。
 - 製品 source/frontend/fixture/cache/秘密情報/署名 asset は配布しません。
 - CI、フレームワーク固有設定、自動コピーCLI、npm公開は含みません。
 - コピー対象・既存ファイル保護・Huskyの手動有効化は言語別READMEを正本とします。
