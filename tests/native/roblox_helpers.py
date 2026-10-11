@@ -61,6 +61,10 @@ def roblox_env(root: Path) -> dict[str, str]:
 
 
 def copy_fixture(name: str) -> Path:
+    for needed in ["roblox.yml", "globalTypes-1.69.0.d.luau"]:
+        if not (SEED / needed).is_file():
+            raise RuntimeError(f"seed file {SEED / needed} missing; prepare the approved Git-ignored seed "
+                               "(see roblox/README.md, maintenance prerequisites)")
     CACHE.mkdir(parents=True, exist_ok=True)
     root = Path(tempfile.mkdtemp(prefix=f"{name}-", dir=CACHE)) / "project"
     shutil.copytree(LEAF, root)

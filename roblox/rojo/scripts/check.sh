@@ -12,11 +12,21 @@ DEFS_SHA256='7db9cd4fe55a4d26f3f7d5a39b6279a376f95a6c055c71d5591c26a1d525aaf2'
 DEFS=.luau-lsp-cache/globalTypes-1.69.0.d.luau
 
 [ -s rokit.toml ] || fail 'missing rokit.toml'
-pins=$(awk -F'"' '/^[a-z-]+ = "[^"]+@[^"]+"$/ { split($1, k, " "); n = split($2, v, "@"); print k[1], v[n] }' rokit.toml)
+# Every non-comment line under [tools] must be a plain pin; anything else would skip a check.
+pins=$(awk '
+    /^[[:space:]]*(#|$)/ { next }
+    /^\[/ { tools = ($0 == "[tools]"); next }
+    !tools { next }
+    /^[a-z0-9_-]+ = "[^"]+\/[^"@]+@[^"]+"$/ {
+        split($0, q, "\""); n = split(q[2], v, "@"); print $1, v[n]; next
+    }
+    { bad = 1; print "!" $0 }
+    END { exit bad }
+' rokit.toml) || fail "cannot parse rokit.toml [tools] line: $(printf '%s\n' "$pins" | sed -n 's/^!//p' | head -n 1)"
 [ -n "$pins" ] || fail 'rokit.toml pins no tools'
 while read -r tool version; do
     command -v "$tool" >/dev/null 2>&1 || fail "$tool is missing; run rokit install and put ~/.rokit/bin first on PATH"
-    actual=$("$tool" --version 2>&1) || fail "cannot read $tool version: $actual"
+    actual=$("$tool" --version </dev/null 2>&1) || fail "cannot read $tool version: $actual"
     printf '%s\n' "tool: $(command -v "$tool") $actual"
     case " $actual " in
         *[!0-9.]"$version"[!0-9.]*) ;;
@@ -28,8 +38,17 @@ EOF
 
 find src -type f -name '*.luau' | grep -q . || fail 'no Luau source under src/'
 [ -s roblox.yml ] || fail 'missing roblox.yml; run selene generate-roblox-std and commit it'
-if awk '/^\[/ { s = ($0 ~ /^\[(server-|dev-)?dependencies\]$/) } s && /^[A-Za-z0-9_-]+ *=/ { f = 1 } END { exit !f }' wally.toml \
-    && [ ! -d Packages ]; then
+# Only [dependencies] (Packages/) is wired into Rojo; comments and indentation are ignored.
+wally_tables=$(awk '
+    { sub(/#.*/, ""); gsub(/^[[:space:]]+|[[:space:]]+$/, "") }
+    /^\[/ { table = $0; next }
+    table ~ /^\[(server-|dev-)?dependencies\]$/ && /^[A-Za-z0-9_-]+[[:space:]]*=/ { print table }
+' wally.toml | sort -u)
+case "$wally_tables" in
+    *server-dependencies*|*dev-dependencies*)
+        fail 'this setup supports only [dependencies] (Packages/); move server/dev dependencies or extend default.project.json and .gitignore' ;;
+esac
+if [ -n "$wally_tables" ] && [ ! -d Packages ]; then
     fail 'wally.toml declares dependencies but Packages/ is missing; run wally install'
 fi
 

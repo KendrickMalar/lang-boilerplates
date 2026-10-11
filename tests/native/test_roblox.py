@@ -1,6 +1,8 @@
 """Real Rokit-pinned tools against isolated fixtures: normal passes, each defect fails."""
 import unittest
+from unittest.mock import patch
 
+from tests.native import roblox_helpers
 from tests.native.roblox_helpers import copy_fixture, roblox_env, run_check
 
 
@@ -94,6 +96,30 @@ class RobloxCheckTests(unittest.TestCase):
         root = copy_fixture("empty")
         (root / "src/shared/Greeting.luau").unlink()
         self.assert_fails(run_check(root, "format"), "no Luau source")
+
+    def test_server_or_dev_dependencies_are_rejected(self):
+        root = copy_fixture("devdeps")
+        wally = root / "wally.toml"
+        wally.write_text(wally.read_text() + '\n[dev-dependencies]\nTestEZ = "roblox/testez@0.4.1"\n')
+        self.assert_fails(run_check(root, "format"), "only [dependencies]")
+
+    def test_commented_wally_dependency_still_requires_packages(self):
+        root = copy_fixture("wallycomment")
+        wally = root / "wally.toml"
+        wally.write_text(wally.read_text().replace("[dependencies]", "[dependencies] # deps")
+                         + '  Promise = "evaera/promise@4.0.0"\n')
+        self.assert_fails(run_check(root, "format"), "wally install")
+
+    def test_unparsed_rokit_pin_fails_closed(self):
+        root = copy_fixture("rokitcomment")
+        pins = root / "rokit.toml"
+        pins.write_text(pins.read_text().replace('StyLua@2.5.2"', 'StyLua@2.5.2" # formatter'))
+        self.assert_fails(run_check(root, "format"), "cannot parse rokit.toml")
+
+    def test_missing_seed_explains_prerequisite(self):
+        with patch.object(roblox_helpers, "SEED", roblox_helpers.CACHE / "no-such-seed"):
+            with self.assertRaisesRegex(RuntimeError, "seed"):
+                copy_fixture("noseed")
 
     def test_unknown_stage(self):
         root = copy_fixture("stage")

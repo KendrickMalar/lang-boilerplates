@@ -53,6 +53,9 @@ Rojo の配置は次の通りです。`Packages` は optional なので、`wally
    `selene.toml` は `roblox-std-source = "pinned"` のため、Selene は自動更新しません。
 4. 依存を追加したら `wally install` を実行し、`wally.lock` を製品 Git に保存します。
    Wally パッケージの型（wally-package-types）は対象外で、`Packages/**` の型エラーは無視します。
+   対応するのは `[dependencies]`（`Packages/`）だけです。`[server-dependencies]` や
+   `[dev-dependencies]` を使う場合は、`default.project.json`・`.gitignore`・check.sh を製品側で
+   拡張してください。未拡張のまま書くと check.sh は止まります。
 5. Roblox の型定義は、初回の typecheck で luau-lsp 1.69.0 タグの `globalTypes.d.luau` を取得し、
    SHA256 を照合して `.luau-lsp-cache/` に保存します。これがチェック唯一のネットワーク接続です。
 
@@ -74,7 +77,8 @@ sh scripts/check.sh format # format|lint|typecheck|test|build|all
 
 最初の失敗で停止します（成功0、不合格非0）。次の場合も非0です: tool 不在・版違い、`src` に
 `.luau` が無い、`roblox.yml` が無い、`wally.toml` に依存があるのに `Packages/` が無い、
-型定義の SHA256 不一致（キャッシュ済みも毎回照合。壊れたら削除して再取得）、テスト0件。
+型定義の SHA256 不一致（キャッシュ済みも毎回照合。壊れたら削除して再取得）、テスト0件、
+`rokit.toml` の `[tools]` に読めない行がある（行末コメント等）、server/dev 依存がある。
 
 ## テスト
 
