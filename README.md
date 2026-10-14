@@ -34,6 +34,7 @@ suite を自動導入/自動実行しません。tool や依存は対象・保�
 
 ```sh
 pnpm test:native:static
+pnpm test:native:quality # 設定の実効検証。既存Clippy/SwiftLint/swift-format/luau-lspのみ使用
 pnpm test:native:rust
 pnpm test:native:macos
 pnpm test:native:roblox

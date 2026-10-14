@@ -1,1 +1,4 @@
-{ "languageMode": "strict" }
+{
+  "languageMode": "strict",
+  "lintErrors": true
+}

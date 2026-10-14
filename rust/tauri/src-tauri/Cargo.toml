@@ -30,3 +30,8 @@ unwrap_used = "deny"
 expect_used = "deny"
 todo = "deny"
 dbg_macro = "deny"
+
+# Individually selected; check.sh/check.ps1 reject warnings with -D warnings.
+redundant_clone = "warn"
+assigning_clones = "warn"
+or_fun_call = "warn"

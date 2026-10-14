@@ -78,6 +78,35 @@ then obtain permission before execution; never modify existing devices unapprove
 The result bundle summary must contain passing tests and no failed tests;
 SDK presence, build-only, zero or skipped-only tests do not count as app testing.
 
+## Lint and formatter responsibilities
+
+Compiler settings remain Swift 6 mode with warnings as errors. Both macOS/iOS
+leaves use the same lint selection; we do not enable every opt-in or analyzer rule.
+
+| Additional SwiftLint rule | Defect detected |
+| --- | --- |
+| `identical_operands` | Comparing a value with itself |
+| `discarded_notification_center_observer` | Discarding a block observer's removal token |
+| `unhandled_throwing_task` | Launching a throwing Task without handling its error/result |
+| `balanced_xctest_lifecycle` | Defining XCTest setup without corresponding teardown, or vice versa |
+| `empty_xctest_method` | Empty XCTest tests or lifecycle overrides |
+
+These are individually selected rules from SwiftLint **0.65.1**, not a copied
+application preset. The existing `empty_count`, `contains_over_first_not_nil`
+and `force_unwrapping` checks remain enabled. `--strict` fails on warnings too.
+See the [official rule directory](https://realm.github.io/SwiftLint/rule-directory.html)
+and use `swiftlint rules <rule>` with the pinned binary for its exact examples.
+
+Formatting belongs to Xcode's **swiftlang/swift-format**, not the separate
+NickLockwood SwiftFormat tool. Keep 4 spaces / 100 columns. Disable only SwiftLint's
+`trailing_comma` and `line_length`: swift-format adds multiline collection commas,
+while SwiftLint's default forbids them; formatter line wrapping is best-effort,
+and an unbreakable string must not be rejected by a second line-length limit.
+This does not promise a hard 100-column maximum. Other default lint checks remain.
+The [formatter configuration documentation](https://github.com/swiftlang/swift-format/blob/main/Documentation/Configuration.md)
+explains these options; verify against the selected Xcode formatter rather than
+assuming a newer documentation option is supported.
+
 ## Scope and references
 
 Maintainer tests generate minimal SwiftUI/XCTest projects outside this leaf and
