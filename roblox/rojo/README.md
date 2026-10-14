@@ -80,6 +80,22 @@ sh scripts/check.sh format # format|lint|typecheck|test|build|all
 型定義の SHA256 不一致（キャッシュ済みも毎回照合。壊れたら削除して再取得）、テスト0件、
 `rokit.toml` の `[tools]` に読めない行がある（行末コメント等）、server/dev 依存がある。
 
+## 型・lint・書式の分担
+
+`.luaurc` は `languageMode: "strict"` と `lintErrors: true` を使います。
+型エラーに加え、Luau の既定 lint 違反も typecheck の不合格になります。
+`"*": true` による全 lint の有効化や、不要な既定値の書き写しは行いません。
+意図的に未使用の変数は `_unused` のように書けます。
+
+固定版 [luau-lsp の CLI 判定](https://github.com/JohnnyMorganz/luau-lsp/blob/2f42ede46764cfcc6ad569a395c38bbfd3878342/src/AnalyzeCli.cpp)は、
+通常の lint 警告を表示しても終了コード0を返します。
+[同版に含まれる Luau の設定](https://github.com/luau-lang/luau/blob/6e9b580e2e24643214caf0f4bbbb3db911ca30f3/Config/include/Luau/Config.h)では
+`lintErrors` の既定値が false なので、ここを明示的に強化しています。
+
+Selene は既存の呼び出しで警告も不合格になるため、その設定は据え置きです。
+`--allow-warnings` は使いません。StyLua はタブ・幅120・LFを維持します。
+無意味に同じ設定を増やさず、正常コードと lint だけが違反するコードの両方で検証します。
+
 ## テスト
 
 `tests/**/*.spec.luau` は `{ [テスト名]: () -> () }` のテーブルを返します。

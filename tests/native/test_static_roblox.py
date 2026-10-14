@@ -27,7 +27,7 @@ class StaticRobloxTests(unittest.TestCase):
         self.assertEqual(stylua["indent_type"], "Tabs")
         self.assertEqual(stylua["quote_style"], "AutoPreferDouble")
         self.assertEqual(stylua["call_parentheses"], "Always")
-        self.assertEqual(json.loads((LEAF / ".luaurc").read_text()), {"languageMode": "strict"})
+        self.assertEqual(json.loads((LEAF / ".luaurc").read_text()), {"languageMode": "strict", "lintErrors": True})
 
     def test_rojo_tree_mapping(self):
         tree = json.loads((LEAF / "default.project.json").read_text())["tree"]

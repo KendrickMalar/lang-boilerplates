@@ -84,6 +84,21 @@ unsafe/未処理 must-use は deny、Clippy all は warn (priority -1)、
 unwrap/expect/todo/dbg は deny、チェックでは全警告を不合格にします。
 stable rustfmt の幅100・4スペース・LF・edition2024を使用します。
 
+### 個別に追加した Clippy 検査
+
+全 pedantic/nursery/restriction グループは有効にしません。既存の安全検査に、次の3項目だけを追加しています。
+
+| 設定 | 検出するもの | 修正の例 |
+| --- | --- | --- |
+| `redundant_clone` | 元の値をもう使わないのに行う clone | 所有権を移す |
+| `assigning_clones` | 既存のバッファへ clone 結果を代入 | `clone_from` / `clone_into` を検討する |
+| `or_fun_call` | 不要でも先に実行される代替値の生成 | `unwrap_or_else` などへ変える |
+
+[Tauri の実設定（固定 commit）](https://github.com/tauri-apps/tauri/blob/94ffd77664759f38111bde3e85802841da80c3eb/Cargo.toml)でも使われている項目です。
+レベルは `warn`、品質チェックでは既存の `-D warnings` により不合格になります。
+[Clippy のグループ選定の注意](https://doc.rust-lang.org/stable/clippy/lints.html)に従い、restriction の一括有効化や製品固有の禁止APIは持ち込みません。
+コンパイラ設定と stable rustfmt の見た目は据え置きです。
+
 caller の `RUSTUP_HOME`、`CARGO_HOME`、`CARGO_TARGET_DIR` を尊重します。
 隔離検証ではプロジェクトの `.verification/native/rust/` 下へ HOME/cache/target を指定してください。
 環境変数はコマンド単位で指定し、global Rustup/Git/shell 設定を変更しません。

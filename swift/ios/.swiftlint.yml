@@ -2,6 +2,15 @@ opt_in_rules:
   - empty_count
   - contains_over_first_not_nil
   - force_unwrapping
+  - identical_operands
+  - discarded_notification_center_observer
+  - unhandled_throwing_task
+  - balanced_xctest_lifecycle
+  - empty_xctest_method
+# swift-format owns collection commas and best-effort line wrapping.
+disabled_rules:
+  - trailing_comma
+  - line_length
 excluded:
   - .native-check
   - DerivedData

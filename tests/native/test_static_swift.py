@@ -57,7 +57,9 @@ class StaticSwiftTests(unittest.TestCase):
         lint = (ROOT / 'swift/macos/.swiftlint.yml').read_text()
         for rule in ['empty_count', 'contains_over_first_not_nil', 'force_unwrapping']:
             self.assertIn(rule, lint)
-        self.assertNotIn('disabled_rules', lint)
+        disabled = lint.split('disabled_rules:\n', 1)[1].split('excluded:', 1)[0]
+        self.assertEqual(re.findall(r'^  - (\w+)$', disabled, re.MULTILINE),
+                         ['trailing_comma', 'line_length'])
 
 
 if __name__ == '__main__':
