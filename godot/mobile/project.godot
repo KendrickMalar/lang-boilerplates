@@ -1,0 +1,16 @@
+; Godot 4.7 project settings for a mobile game. Rename config/name for the product.
+config_version=5
+
+[application]
+
+config/name="Game"
+config/features=PackedStringArray("4.7", "Mobile")
+
+[debug]
+
+gdscript/warnings/untyped_declaration=2
+
+[rendering]
+
+renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true

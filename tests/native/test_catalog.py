@@ -25,6 +25,13 @@ ROBLOX_FILES = {'README.md', 'LICENSE', '.editorconfig', '.gitignore', 'rokit.to
                 'src/server/.gitkeep', 'src/client/.gitkeep', 'src/shared/.gitkeep',
                 'tests/.gitkeep', 'scripts/check.sh', 'scripts/test.luau',
                 '.githooks/pre-commit', '.githooks/pre-push'}
+GODOT_FILES = {'README.md', 'LICENSE', '.editorconfig', '.gitignore', '.gitattributes',
+               'project.godot', 'gdlintrc', 'gdformatrc', 'src/.gitkeep', 'tests/.gitkeep',
+               'scripts/check.sh', 'scripts/test_runner.gd', 'scripts/test_context.gd',
+               '.githooks/pre-commit', '.githooks/pre-push'}
+BLENDER_FILES = {'README.md', 'LICENSE', '.editorconfig', '.gitignore', 'pyproject.toml',
+                 'models/.gitkeep', 'tests/.gitkeep', 'scripts/check.sh', 'scripts/build.py',
+                 'scripts/test.py', '.githooks/pre-commit', '.githooks/pre-push'}
 
 
 def links(path):
@@ -35,7 +42,8 @@ def links(path):
 class CatalogTests(unittest.TestCase):
     def test_root_language_leaf_navigation(self):
         for language, leaves in [('rust', ['tauri']), ('swift', ['macos', 'ios']),
-                                 ('roblox', ['rojo'])]:
+                                 ('roblox', ['rojo']), ('godot', ['mobile']),
+                                 ('blender', ['assets'])]:
             self.assertIn(f'./{language}/README.md', links(ROOT / 'README.md'))
             for leaf in leaves:
                 self.assertIn(f'{leaf}/README.md', links(ROOT / language / 'README.md'))
@@ -45,7 +53,8 @@ class CatalogTests(unittest.TestCase):
         cache = ROOT / '.verification/native/catalog'
         cache.mkdir(parents=True, exist_ok=True)
         for name, expected in [('rust/tauri', RUST_FILES), ('swift/macos', SWIFT_FILES),
-                               ('swift/ios', SWIFT_FILES), ('roblox/rojo', ROBLOX_FILES)]:
+                               ('swift/ios', SWIFT_FILES), ('roblox/rojo', ROBLOX_FILES),
+                               ('godot/mobile', GODOT_FILES), ('blender/assets', BLENDER_FILES)]:
             with self.subTest(leaf=name):
                 source = ROOT / name
                 actual = {p.relative_to(source).as_posix() for p in source.rglob('*') if p.is_file()}
@@ -79,6 +88,8 @@ class CatalogTests(unittest.TestCase):
             self.assertNotIn('discover', scripts[f'test:native:{name}'])
             self.assertIn('tests.native.test_catalog', scripts[f'test:native:{name}'])
         self.assertIn('test_static_roblox', scripts['test:native:static'])
+        self.assertIn('test_static_godot', scripts['test:native:static'])
+        self.assertIn('test_static_blender', scripts['test:native:static'])
 
 
 class CatalogRunnerTests(unittest.TestCase):

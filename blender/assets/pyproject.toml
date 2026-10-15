@@ -1,0 +1,7 @@
+# ruff settings for Blender 5.2.2 LTS scripts (bundled Python 3.13). No package metadata.
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]

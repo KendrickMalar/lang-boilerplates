@@ -1,0 +1,7 @@
+#!/bin/sh
+# Manual opt-in only. Runs this leaf's check from wherever the leaf is placed.
+set -eu
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$root"
+sh scripts/check.sh format
+exec sh scripts/check.sh lint
