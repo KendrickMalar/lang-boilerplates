@@ -10,6 +10,8 @@ Scaffoldでプロジェクトを作る際に参照する、言語別の設定と
 | Rust | [rust/README.md](./rust/README.md) |
 | Swift | [swift/README.md](./swift/README.md) |
 | Roblox (Luau) | [roblox/README.md](./roblox/README.md) |
+| Godot（GDScript） | [godot/README.md](./godot/README.md) |
+| Blender Python（3D モデル） | [blender/README.md](./blender/README.md) |
 
 Scaffoldは言語を選んだ後、当該言語のREADMEを読み、参照された設定ファイルと導入条件を確認します。各用途は親/兄弟設定に依存せず自己完結します。
 
@@ -66,6 +68,8 @@ iOS27.0 iPhone17/iPad(A16) Simulator app test/build です。Package-only/mock �
 - Rust: Tauri desktop の backend のみ（Rust1.92.0/edition2024/Tauri2.12.2/tauri-build2.7.1）。frontend は利用側で接続。
 - Swift: 標準 Xcode app 用、Swift6 mode/macOS15/iOS17/SwiftLint0.65.1。xcconfig の実効接続を確認。
 - Roblox: Rojo でファイル管理するゲーム用（Rojo7.7.1/StyLua2.5.2/Selene0.32.0/luau-lsp1.69.0/Lune0.10.5/Wally0.3.2 を Rokit で固定）。macOS 実検証、Studio 実同期は未検証。
+- Godot: モバイルゲーム用（Godot4.7.2/gdtoolkit4.5.0）。型付き GDScript を強制し、ヘッドレスで検査とテスト。asuka で手動確認、実ツール suite なし。
+- Blender: 3D モデルをコードで作る用（Blender5.2.2 LTS/ruff0.17.0/glTF-Transform4.5.1）。glTF 書き出しと検査。asuka で手動確認、実ツール suite なし。
 - 製品 source/frontend/fixture/cache/秘密情報/署名 asset は配布しません。
 - CI、フレームワーク固有設定、自動コピーCLI、npm公開は含みません。
 - コピー対象・既存ファイル保護・Huskyの手動有効化は言語別READMEを正本とします。
