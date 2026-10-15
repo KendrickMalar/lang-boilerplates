@@ -1,0 +1,6 @@
+/.godot/
+/build/
+*.tmp
+/.verification/
+.DS_Store
+# export_presets.cfg belongs in the consuming project repository.
