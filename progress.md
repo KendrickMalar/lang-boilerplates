@@ -206,3 +206,30 @@
 - 結果（初回マージ時）: native static 19 tests OK、native roblox 20 tests OK（正常 all、整形/Lint/strict 型/失敗 spec/非 table spec/0件/欠落 path/tool 不在/版違い/型定義 SHA 不一致/Packages 欠落/roblox.yml 欠落/空 src/未知 stage、ローカル bare remote への実 commit/push）。
 - `pnpm test:native:*` は ERR_PNPM_VERIFY_DEPS_BEFORE_RUN（依存未導入）で起動せず、同一の python コマンドを直接実行。guard は回避していない。`pnpm test`（TypeScript）は未実行。
 - 未検証: Roblox Studio 実同期、Windows/Linux、Wally レジストリからの実取得、Rust/Swift runtime suite の再実行。
+
+## Godot / Blender — godot/mobile・blender/assets
+
+- 2026-10-15、asuka（macOS 27.0.1、Apple Silicon）で手動確認。Godot 4.7.2、gdtoolkit 4.5.0、
+  Blender 5.2.2 LTS、ruff 0.17.0、glTF-Transform 4.5.1。
+- leaf を空白入りパスへコピーし、正常系2件・異常系15件を実行。全件期待どおり（各失敗の理由も出力で確認）。
+- テスト中の実行時エラーは、実行器の集計では PASS と数えられるが、check.sh が出力の SCRIPT ERROR で不合格にする。
+- 実ツール suite は設計どおり作っていない。静的検査は `test:native:static` に追加（Godot 7・Blender 7、合計33件成功）。
+- Android/iOS 書き出し・実機・Windows/Linux・Git フックの実 push は未実行。
+- 結果:
+  - PASS godot-normal (exit 0)
+  - PASS godot-format (exit 1)
+  - PASS godot-lint (exit 1)
+  - PASS godot-untyped (exit 1)
+  - PASS godot-type-error (exit 1)
+  - PASS godot-failing-test (exit 1)
+  - PASS godot-runtime-error (exit 1)
+  - PASS godot-zero-tests (exit 1)
+  - PASS blender-normal (exit 0)
+  - PASS blender-format (exit 1)
+  - PASS blender-lint (exit 1)
+  - PASS blender-over-budget (exit 1)
+  - PASS blender-exception-plus-normal (exit 1)
+  - PASS blender-empty-scene (exit 1)
+  - PASS blender-zero-tests (exit 1)
+  - PASS godot-wrong-version (exit 1)
+  - PASS blender-wrong-ruff (exit 1)
