@@ -45,6 +45,7 @@ godot/
     tests/.gitkeep
     scripts/check.sh
     scripts/test_runner.gd
+    scripts/test_context.gd
     .githooks/pre-commit
     .githooks/pre-push
 blender/
@@ -85,11 +86,12 @@ blender/
 ### 3.2 godot/mobile
 
 - `project.godot`: `config_version=5`、`config/features` に `4.7` と `Mobile`、描画方式 Mobile、ETC2/ASTC の VRAM 圧縮を有効（Android 書き出しに必要）、`debug/gdscript/warnings/untyped_declaration=2`（エラー）。キー名は実装時に Godot 4.7.2 で生成・確認します。
-- `gdlintrc` / `gdformatrc`: gdtoolkit 4.5.0 の既定を `--dump-default-config` で出し、変更点だけ残します。行長は 100、インデントはタブ（Godot エディタの既定）に合わせます。
+- `gdlintrc` / `gdformatrc`: gdtoolkit 4.5.0 の `--dump-default-config` の全内容を置き、除外ディレクトリに `.godot` と `build` を足します。行長 100、タブ。将来の版で既定が変わっても挙動を固定するため、差分だけでなく全項目を置きます（2026-10-15 改訂）。
 - `.gitignore`: `/.godot/`、`/build/`、`*.tmp`、`/.verification/`、`.DS_Store`。`export_presets.cfg` は製品で管理するため除外しません。
 - `.gitattributes`: 改行を LF に固定（Godot 公式の推奨に合わせる）。
 - テスト規約: `tests/**/test_*.gd` は `extends RefCounted`。`func test_*(t: TestContext) -> void` を実行器が呼び、`t.expect(cond, msg)` / `t.expect_eq(a, b)` で失敗を記録します。GDScript には例外がないため、assert ではなく記録方式にします。読込み失敗、`test_*` が0件のファイル、全体で0件は失敗です。
-- `TestContext` は `scripts/test_runner.gd` 内の内部クラスとして配布し、別ファイルにしません。
+- `TestContext` は `scripts/test_context.gd`（`class_name TestContext`）として配布します。内部クラスではテスト側から型名で参照できないためです（2026-10-15 改訂、asuka で確認）。
+- テスト中の実行時エラー（null 参照など）で関数が途中終了しても、Godot は実行を続けます。check.sh が出力の `SCRIPT ERROR` を失敗として扱います。
 
 ### 3.3 blender/assets
 
@@ -111,9 +113,9 @@ blender/
 | format | `gdformat --check src tests scripts` |
 | lint | `gdlint src tests scripts` |
 | typecheck | `godot --headless --path . --import` の後、各 `.gd` を `godot --headless --path . --check-only --script <file>` |
-| test | `godot --headless --path . --script scripts/test_runner.gd` |
+| test | `--import` の後 `godot --headless --path . --script scripts/test_runner.gd` |
 
-typecheck で構文・型エラーが非0になることは、実装時に実ツールで確認します。非0にならない場合は出力のエラー行で判定する方式に切り替え、設計書を改訂します。
+Godot 4.7.2 の `--check-only` は、構文エラー・型エラー・型なし宣言でも終了コード0を返します（2026-10-15 asuka で確認）。そのため check.sh は、終了コードに加えて出力に `SCRIPT ERROR`・`Parse Error`・`Failed to load script` があれば失敗にします。test 段階も同じ判定を使います（2026-10-15 改訂）。
 
 ### 4.2 blender/assets の check.sh
 
@@ -127,7 +129,7 @@ typecheck で構文・型エラーが非0になることは、実装時に実ツ
 | test | `blender -b --factory-startup --python scripts/test.py` |
 | build | 一時ディレクトリへ `blender -b --factory-startup --python scripts/build.py -- --out <tmp>` → 各 `.glb` を `gltf-transform validate` → 一時ディレクトリを削除 |
 
-Blender は Python の例外でも終了コード0を返すことがあるため、`build.py` と `test.py` は失敗時に `sys.exit(1)` を明示し、check.sh は `--python-exit-code 1` も付けます。
+Blender 5.2.2 は `--python` のスクリプトが例外で止まっても終了コード0を返します（2026-10-15 asuka で確認）。check.sh は `--python-exit-code 1` を付け、`build.py` と `test.py` は失敗時に `sys.exit(1)` を明示します。`gltf-transform validate` は不正な glTF で終了コード1を返すことを確認済みです。
 
 ### 4.3 Git フック
 
@@ -182,8 +184,8 @@ Android/iOS への書き出しと実機、Windows/Linux、Godot エディタで�
 
 | リスク | 影響 | 対策 |
 | --- | --- | --- |
-| `--check-only` が型エラーでも0を返す | typecheck が素通り | 実装時に実ツールで確認。必要なら出力判定へ切替。 |
-| Blender の例外で終了コード0 | 失敗を見逃す | `sys.exit(1)` の明示と `--python-exit-code 1`。手動確認で異常系を試す。 |
+| `--check-only` が型エラーでも0を返す（確認済み） | 終了コードだけでは素通り | 出力の `SCRIPT ERROR` 等で判定する。Godot 更新時に出力形式が変わらないか手動確認で見る。 |
+| Blender の例外で終了コード0（確認済み） | 失敗を見逃す | `sys.exit(1)` の明示と `--python-exit-code 1`。手動確認で異常系を試す。 |
 | gdtoolkit が Godot 4.7 の新構文に未対応 | 正しいコードが lint/format で落ちる | 手動確認で検知。発生時は README に回避策を記載。 |
 | 実ツール suite がない | 版更新時の退行を自動で検知できない | 版更新のたびに 5.2 の手動確認をやり直すと README に書く。 |
 | 面数上限 3,000 は仮置き | ゲームによって過大・過小 | モデルごとに `MAX_TRIANGLES` で上書き可能にする。 |
@@ -208,3 +210,4 @@ Android/iOS への書き出しと実機、Windows/Linux、Godot エディタで�
 | 2026-10-15 | Godot 4.7 + GDScript と Blender Python を採用（調査レポート） |
 | 2026-10-15 | ひな形はいったん見送り → scaffold が対応表外の言語で止まるため、設定と check.sh までの leaf を作り対応表に登録すると決定 |
 | 2026-10-15 | 2 leaf に分割、自作テスト実行器、手動確認1回、静的検査のみの方針を承認 |
+| 2026-10-15 | asuka の事前確認で改訂: `--check-only` の終了コードが当てにならないため出力判定、`TestContext` を別ファイル化、gdtoolkit 設定は全項目を置く |
