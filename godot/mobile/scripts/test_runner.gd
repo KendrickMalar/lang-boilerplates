@@ -30,7 +30,12 @@ func _initialize() -> void:
 		var suite: Object = script.new()
 		for method_name: String in names:
 			var t: TestContext = TestContext.new()
-			suite.call(method_name, t)
+			var result: Variant = suite.call(method_name, t)
+			# A test that awaits returns early; failures recorded after the await would be lost.
+			if result is Object and (result as Object).get_class() == "GDScriptFunctionState":
+				failed += 1
+				print("FAIL %s :: %s: await is not supported in tests" % [path, method_name])
+				continue
 			if t.failures.is_empty():
 				passed += 1
 				print("PASS %s :: %s" % [path, method_name])

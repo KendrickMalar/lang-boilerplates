@@ -213,6 +213,7 @@
   Blender 5.2.2 LTS、ruff 0.17.0、glTF-Transform 4.5.1。
 - leaf を空白入りパスへコピーし、正常系2件・異常系15件を実行。全件期待どおり（各失敗の理由も出力で確認）。
 - テスト中の実行時エラーは、実行器の集計では PASS と数えられるが、check.sh が出力の SCRIPT ERROR で不合格にする。
+- 最終レビュー指摘で、`await` するテストが黙って合格する問題を修正（実行器が GDScriptFunctionState を検知して FAIL）。修正前 exit 0・修正後 exit 1 を asuka で確認し、17件を再実行して全件期待どおり。
 - 実ツール suite は設計どおり作っていない。静的検査は `test:native:static` に追加（Godot 7・Blender 7、合計33件成功）。
 - Android/iOS 書き出し・実機・Windows/Linux・Git フックの実 push は未実行。
 - 結果:

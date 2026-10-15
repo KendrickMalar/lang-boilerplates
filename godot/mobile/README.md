@@ -57,10 +57,12 @@ sh scripts/check.sh format # format|lint|typecheck|test|all
 | format | `gdformat --check src tests scripts`（書換えなし） |
 | lint | `gdlint src tests scripts` |
 | typecheck | `godot --headless --import` の後、各 `.gd` を `--check-only` で解析 |
-| test | `godot --headless --script scripts/test_runner.gd` |
+| test | `--import` の後 `godot --headless --path . --script scripts/test_runner.gd` |
 
 Godot 4.7.2 は構文エラー・型エラーでも終了コード0を返し、テスト中の実行時エラーの後も処理を続けます。
 そのため check.sh は、出力に `SCRIPT ERROR`・`Parse Error`・`Failed to load script` があれば不合格にします。
+実行時エラーで途中終了したテストは、実行器の集計では PASS と表示され、実行器単体の終了コードも0です。
+合否は必ず check.sh 経由で判定してください（実行器を直接呼んだ結果を合格とみなさない）。
 最初の失敗で停止します（成功0、不合格非0）。
 
 ## テスト
@@ -80,6 +82,9 @@ func test_adds_points(t: TestContext) -> void:
 ```
 
 テスト0件、読み込めないテスト、`test_` メソッドの無いファイルは失敗です。
+テストの中で `await` は使えません（最初の `await` で呼び出しが戻り、その後の記録を拾えないため、
+`await` したテストは失敗にします）。フレームやシグナルを待つ処理は、待たずに確かめられる純粋なロジックに
+分けてテストしてください。
 
 ## 手動 Git フック（別承認で有効化）
 

@@ -33,6 +33,16 @@ class StaticGodotTests(unittest.TestCase):
                        "--import", "scripts/test_runner.gd"]:
             self.assertIn(marker, text)
 
+    def test_runner_rejects_coroutine_tests(self):
+        runner = (LEAF / "scripts/test_runner.gd").read_text()
+        self.assertIn("GDScriptFunctionState", runner)
+        self.assertIn("await", (LEAF / "README.md").read_text())
+
+    def test_readme_says_verdict_comes_from_check_sh(self):
+        text = (LEAF / "README.md").read_text()
+        self.assertIn("check.sh 経由", text)
+        self.assertIn("godot --headless --path . --script scripts/test_runner.gd", text)
+
     def test_gdtoolkit_configs_pin_full_defaults(self):
         lint = (LEAF / "gdlintrc").read_text()
         for entry in ["max-line-length: 100", "tab-characters: 1", "  .godot: null",
