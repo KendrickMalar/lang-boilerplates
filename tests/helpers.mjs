@@ -94,8 +94,14 @@ export async function copyPreset(
   }
   return root;
 }
-export async function expectResult(root, args, status, diagnostic) {
-  const result = runAt(root, "pnpm", args);
+export async function expectResult(
+  root,
+  args,
+  status,
+  diagnostic,
+  extraEnv = {},
+) {
+  const result = runAt(root, "pnpm", args, extraEnv);
   await saveLog(basename(root) + "-" + args.join("-"), result);
   if (status === 0 && result.status !== 0) throw new Error(result.output);
   if (status !== 0 && result.status === 0)

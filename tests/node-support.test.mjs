@@ -14,6 +14,7 @@ test("all project manifests describe the actually supported Node release lines",
     "package.json",
     "typescript/node/package.json",
     "typescript/web/package.json",
+    "typescript/web-game-3d/package.json",
     "typescript/library/package.json",
   ]) {
     const pkg = JSON.parse(readFileSync(join(ROOT, relative), "utf8"));

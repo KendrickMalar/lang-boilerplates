@@ -4,14 +4,14 @@ Scaffoldでプロジェクトを作る際に参照する、言語別の設定と
 
 ## 言語別の入口
 
-| 言語       | 導入手順                                       |
-| ---------- | ---------------------------------------------- |
-| TypeScript | [typescript/README.md](./typescript/README.md) |
-| Rust | [rust/README.md](./rust/README.md) |
-| Swift | [swift/README.md](./swift/README.md) |
-| Roblox (Luau) | [roblox/README.md](./roblox/README.md) |
-| Godot（GDScript） | [godot/README.md](./godot/README.md) |
-| Blender Python（3D モデル） | [blender/README.md](./blender/README.md) |
+| 言語                        | 導入手順                                       |
+| --------------------------- | ---------------------------------------------- |
+| TypeScript                  | [typescript/README.md](./typescript/README.md) |
+| Rust                        | [rust/README.md](./rust/README.md)             |
+| Swift                       | [swift/README.md](./swift/README.md)           |
+| Roblox (Luau)               | [roblox/README.md](./roblox/README.md)         |
+| Godot（GDScript）           | [godot/README.md](./godot/README.md)           |
+| Blender Python（3D モデル） | [blender/README.md](./blender/README.md)       |
 
 Scaffoldは言語を選んだ後、当該言語のREADMEを読み、参照された設定ファイルと導入条件を確認します。各用途は親/兄弟設定に依存せず自己完結します。
 
@@ -21,12 +21,13 @@ Node 24.15以上の24系またはNode26以上（Node25は対象外）、pnpm 12.
 
 ```sh
 pnpm install --ignore-scripts --engine-strict --store-dir .verification/pnpm-store
+PLAYWRIGHT_BROWSERS_PATH="$PWD/.verification/playwright" pnpm exec playwright install chromium --only-shell
 pnpm test
 ```
 
-TypeScript の自己完結した3用途ディレクトリの構造、選択ディレクトリだけをコピーした後の型チェック・Lint・整形・テスト・ビルド、正常系と異常系、実Gitフックを検証します。fixtureとログは `.verification/` に生成し、Gitへ追加しません。テストはsynthetic HOMEとローカルbare remoteを使い、ユーザーのグローバルGitフックを変更せず、GitHubへ試験pushしません。
+TypeScript の自己完結した4用途ディレクトリの構造、選択ディレクトリだけをコピーした後の型チェック・Lint・整形・テスト・ビルド、正常系と異常系、実Gitフックを検証します。fixtureとログは `.verification/` に生成し、Gitへ追加しません。テストはsynthetic HOMEとローカルbare remoteを使い、ユーザーのグローバルGitフックを変更せず、GitHubへ試験pushしません。
 
-推移依存はルートpnpm-lock.yamlで固定します。型定義とLintの対応範囲やpnpmの依存安全設定を変更したら、3用途を再検証してください。
+推移依存はルートpnpm-lock.yamlで固定します。型定義とLintの対応範囲やpnpmの依存安全設定を変更したら、4用途を再検証してください。
 
 ## Native の保守検証（明示実行）
 
@@ -64,7 +65,7 @@ iOS27.0 iPhone17/iPad(A16) Simulator app test/build です。Package-only/mock �
 
 ## 範囲
 
-- TypeScript: Node/CLI、汎用Web、npmライブラリ。
+- TypeScript: Node/CLI、汎用Web、ブラウザ3Dゲーム（Three.js＋Rapier）、npmライブラリ。
 - Rust: Tauri desktop の backend のみ（Rust1.92.0/edition2024/Tauri2.12.2/tauri-build2.7.1）。frontend は利用側で接続。
 - Swift: 標準 Xcode app 用、Swift6 mode/macOS15/iOS17/SwiftLint0.65.1。xcconfig の実効接続を確認。
 - Roblox: Rojo でファイル管理するゲーム用（Rojo7.7.1/StyLua2.5.2/Selene0.32.0/luau-lsp1.69.0/Lune0.10.5/Wally0.3.2 を Rokit で固定）。macOS 実検証、Studio 実同期は未検証。

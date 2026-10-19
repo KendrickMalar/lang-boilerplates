@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { ROOT } from "./helpers.mjs";
 
 test("each leaf includes its own complete safe TypeScript configuration", () => {
-  for (const name of ["node", "web", "library"]) {
+  for (const name of ["node", "web", "library", "web-game-3d"]) {
     const dir = join(ROOT, "typescript", name);
     assert.ok(existsSync(dir), "missing standalone template: " + name);
     for (const file of [
@@ -46,7 +46,9 @@ test("each leaf includes its own complete safe TypeScript configuration", () => 
     assert.equal(manifest.private, true);
     assert.equal(
       manifest.scripts.check,
-      "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build",
+      name === "web-game-3d"
+        ? "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm test:e2e:preview"
+        : "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build",
     );
     assert.equal(manifest.scripts.prepare, undefined);
     assert.equal(manifest.scripts.postinstall, undefined);
@@ -71,5 +73,6 @@ test("TypeScript root contains only the language entry and standalone directorie
     "library",
     "node",
     "web",
+    "web-game-3d",
   ]);
 });
