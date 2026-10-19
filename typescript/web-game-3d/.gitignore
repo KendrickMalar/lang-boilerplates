@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.husky/_/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+.DS_Store
+test-results/
+playwright-report/
+.playwright/

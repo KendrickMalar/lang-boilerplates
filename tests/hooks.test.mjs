@@ -9,7 +9,7 @@ import { ROOT, copyPreset, write, runAt, saveLog } from "./helpers.mjs";
 async function snapshot() {
   const result = spawnSync(
     "git",
-    ["config", "--global", "--get", "core.hooksPath"],
+    ["config", "--global", "--path", "--get", "core.hooksPath"],
     { encoding: "utf8", env: process.env },
   );
   const path = result.stdout.trim();

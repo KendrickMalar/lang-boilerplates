@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+pnpm-lock.yaml
+.husky/_/
+.verification/
+.superpowers/
+test-results/
+playwright-report/
+.playwright/
