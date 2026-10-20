@@ -6,13 +6,17 @@
     "outDir": "dist",
     "declaration": true
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.mts", "src/**/*.cts"],
   "exclude": [
     "tests",
     "dist",
     "node_modules",
     "src/**/*.test.ts",
+    "src/**/*.test.mts",
+    "src/**/*.test.cts",
     "src/**/*.spec.ts",
+    "src/**/*.spec.mts",
+    "src/**/*.spec.cts",
     "src/**/__tests__/**"
   ]
 }

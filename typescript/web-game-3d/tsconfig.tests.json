@@ -7,6 +7,14 @@
     "types": ["node", "vite/client"],
     "noEmit": true
   },
-  "include": ["tests/**/*.test.ts", "src/**/*.ts", "src/**/*.tsx"],
+  "include": [
+    "tests/**/*.test.ts",
+    "tests/**/*.test.mts",
+    "tests/**/*.test.cts",
+    "src/**/*.ts",
+    "src/**/*.mts",
+    "src/**/*.cts",
+    "src/**/*.tsx"
+  ],
   "exclude": ["tests/e2e/**"]
 }

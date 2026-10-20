@@ -85,7 +85,7 @@ for (const preset of ["node", "web", "library"]) {
         root,
         ["check"],
         1,
-        /No test files found|No inputs were found/,
+        /No test files found|No inputs were found|path does not exist: src|No product source directory/,
       );
     },
   );

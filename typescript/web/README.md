@@ -15,6 +15,11 @@
 | [tsconfig.json](./tsconfig.json)                   | `tsconfig.json`                          |
 | [eslint.base.mjs](./eslint.base.mjs)               | `eslint.base.mjs`                        |
 | [eslint.config.mjs](./eslint.config.mjs)           | `eslint.config.mjs`                      |
+| [.jscpd.json](./.jscpd.json)                       | `.jscpd.json`                            |
+| [check-commit.mjs](./check-commit.mjs)             | `check-commit.mjs`                       |
+| [check-similarity.mjs](./check-similarity.mjs)     | `check-similarity.mjs`                   |
+| [quality-sources.mjs](./quality-sources.mjs)       | `quality-sources.mjs`                    |
+| [check-duplicates.mjs](./check-duplicates.mjs)     | `check-duplicates.mjs`                   |
 | [.prettierrc.json](./.prettierrc.json)             | `.prettierrc.json`                       |
 | [.prettierignore](./.prettierignore)               | `.prettierignore`                        |
 | [.editorconfig](./.editorconfig)                   | `.editorconfig`                          |
@@ -52,19 +57,25 @@ pnpm install --ignore-scripts --engine-strict
 
 ## 3. 製品コードとテストを用意して検証する
 
-| コマンド            | 内容                                                     |
-| ------------------- | -------------------------------------------------------- |
-| `pnpm typecheck`    | src・テスト・TS設定の型チェック                          |
-| `pnpm lint`         | 型情報Lint。warningも不合格                              |
-| `pnpm format`       | 整形適用                                                 |
-| `pnpm format:check` | 整形検査                                                 |
-| `pnpm test`         | Vitestを1回実行。テストなしは不合格                      |
-| `pnpm build`        | 製品ビルド                                               |
-| `pnpm check`        | 型チェック→Lint→整形検査→テスト→ビルド。最初の失敗で停止 |
+| コマンド               | 内容                                                                 |
+| ---------------------- | -------------------------------------------------------------------- |
+| `pnpm typecheck`       | src・テスト・TS設定の型チェック                                      |
+| `pnpm lint`            | 型情報Lint。warningも不合格                                          |
+| `pnpm lint:duplicates` | 製品srcのコード重複率0%を検査                                        |
+| `pnpm lint:similarity` | 関数の構造的類似度90%以上を不合格にする                              |
+| `pnpm format`          | 整形適用                                                             |
+| `pnpm format:check`    | 整形検査                                                             |
+| `pnpm test`            | Vitestを1回実行。テストなしは不合格                                  |
+| `pnpm build`           | 製品ビルド                                                           |
+| `pnpm check`           | 型チェック→Lint→重複→類似度→整形検査→テスト→ビルド。最初の失敗で停止 |
 
 変更ファイルだけの検査を全体の合格にしません。依存不整合なら検証中に自動導入せず、install段階へ戻ります。
 
 ## Lintの方針
+
+- `src/**`と`tests/**`のJS/TSを循環複雑度10・関数50行（空行とコメントを除外、IIFEも検査）・ネスト3段までに制限します。設定ファイルとroot補助スクリプトはこの3ルールの対象外です。
+- `pnpm lint:duplicates`はjscpd 5.4.1で製品srcの5行以上かつ50トークン以上の重複を検査し、重複率が0%を超えたら失敗します。併置test/spec・__tests__とsrc外のテスト・設定・生成物は対象外です。意味的に同じ処理をすべて検出するものではありません。対応OSのoptional binaryを使い、install scriptや検査時ダウンロードは行いません。
+- `check-duplicates.mjs`と`check-similarity.mjs`は同じ`quality-sources.mjs`で製品srcを列挙します。`.ts/.tsx/.mts/.cts`と`.js/.mjs/.cjs`を扱い、対象0件・source symlinkは不合格です。重複検査は実ファイルの最大サイズをCLIへ明示し、既定の1 MiB超過による黙示skipを防ぎます。CLIのgitignoreには依存せず、除外するテストはここで明示的に決めます。
 
 - TypeScriptは`strictTypeChecked`＋`stylisticTypeChecked`で検査します。非null断定（`value!`）・不要な条件・危険な型操作などを検出し、`import type`の書き方を揃えます。any・Promiseの待ち忘れ検出は維持します。
 - 不要になったeslint-disableコメントはerrorです。スタイルの細部はPrettierへ任せ、整形とLintの競合ルールを無効化します。
@@ -83,29 +94,78 @@ pnpm install --ignore-scripts --engine-strict
 
 作者の設定を丸ごと複製したものではなく、公式プリセット/APIと必要なルールを組み合わせ、既存の用途・安全境界へ適合させています。
 
+### similarity-tsの導入（明示実行）
+
+`pnpm install`とは別に、similarity-ts **0.5.0**をプロジェクト内の`.tools/similarity/`へ導入します。checkやcommitからの自動ダウンロード、グローバル導入は行いません。既存ファイル・symlinkがあれば停止して由来と版を確認し、上書きしません。
+
+公式Release `https://github.com/mizchi/similarity/releases/tag/v0.5.0` の以下のarchiveを取得し、SHA-256が一致することを確認してから展開します。archive内の`similarity-ts`とLICENSEを`.tools/similarity/`へ配置し、実行権限を確認します。OS/CPUの違うバイナリを流用しません。
+
+| 対象                | archive                                           | SHA-256                                                          |
+| ------------------- | ------------------------------------------------- | ---------------------------------------------------------------- |
+| Apple Silicon macOS | similarity-v0.5.0-aarch64-apple-darwin.tar.gz     | d5a6abcf915b87061857c23a1934883a99b93970a66c627cc8b7f3286c0ba916 |
+| Linux x64 GNU       | similarity-v0.5.0-x86_64-unknown-linux-gnu.tar.gz | 2afda6201b6afb1ee36c1ce51b95a538ec99310c79f661905536d917470a406a |
+
+そのほかの環境では、既に導入済みの対応Rust toolchainを確認し、導入元・保存先・ビルドの副作用が許可された場合だけ次を実行します。Rust/toolchain自体の自動導入・更新は行いません。不足ならsetupをブロックします。
+
+```sh
+cargo install similarity-ts --version 0.5.0 --locked --root "$PWD/.tools/similarity"
+```
+
+Cargoの場合は`.tools/similarity/bin/similarity-ts`（Windowsは`similarity-ts.exe`）が生成されるので、既存対象を上書きせず`.tools/similarity/similarity-ts`（Windowsは`similarity-ts.exe`）へ配置します。最後にそのバイナリで`--version`を実行し、`similarity-ts 0.5.0`を確認します。`.tools/`はGit・書式・Lintの対象外です。Cargoでビルドする経路とLinux/Windows/Intel Macの動作は、macOS ARM64の実検証と区別して記録します。
+
+`pnpm lint:similarity`は、製品srcの関数を**類似度90%以上・ASTノード50個以上**で検査します。テスト（test/spec/**tests**）と型定義の類似検査は除外し、fast pre-filterを無効化します。jscpdの「5行かつ50トークン」とは異なる基準です。similarity-ts自身が短い関数へ適用するスコア補正も維持します。構造が似ていることは、同じ意味・共通化すべきことの証明ではありません。
+
+`check-similarity.mjs`は版・起動・対象ファイル数を確認し、CLIへ渡す製品ファイルを明示列挙します。CLIによる構文解析エラーの黙殺を避けるため、固定Releaseの解析器と同版の`oxc-parser 0.73.2`で全対象を事前解析します。未導入・版違い・対象0件・解析エラー・異常終了・タイムアウトは不合格です。対応していない新構文は無視せず、tool版の見直しが必要なエラーとして扱います。
+
 ## 4. 既存Gitフックを確認し、許可後に有効化する
 
-設定コピー・依存導入だけではフックは有効になりません。Git root、既存core.hooksPath、その指すフック、Git共通ディレクトリのhooks、既存.huskyを確認します。
+設定コピー・依存導入だけではフックは有効になりません。まずGit rootと既存フックを確認し、対象と変更方式の許可を得ます。プロジェクトrootとGit rootが異なる場合は停止して別途設計します。
 
 ```sh
 git rev-parse --show-toplevel
 git rev-parse --git-common-dir
-git config --show-origin --get core.hooksPath
+git config --show-origin --get-all core.hooksPath
 ```
 
-未設定時の最後のexit 1は未設定を表します。.sampleは有効フックではありません。既存フックや別hooksPathがある場合、今回コピーしたもの以外の.huskyがある場合、プロジェクトがGit rootと異なる場合は停止し、統合方針を別途確認します。グローバルフックを変更しません。
+最後のexit 1はhooksPath未設定を表します。設定先のフック、Git共通ディレクトリのhooks、既存.huskyの内容を読みます。.sampleは有効フックではありません。既存ファイル・symlinkを上書きしません。
 
-条件とプロジェクトローカルGit設定変更の許可が揃った場合だけ、Git rootで実行します。
+### hooksPathと既存フックが無い場合
+
+ローカルGit設定変更の許可後、Git rootで `pnpm exec husky` を実行します。localのcore.hooksPathが`.husky/_`になります。`.husky/_`はGit管理せず、配布する`.husky/pre-commit`・`.husky/pre-push`・`check-commit.mjs`は管理します。`husky init`による上書きやprepare/postinstallでの自動有効化はしません。
+
+### 既存グローバルフックがrepoフックを呼び出す場合
+
+このMacの`~/.git-hooks`のように、各フックが`git rev-parse --git-common-dir`配下のhooksへ委譲することを実物で確認します。この場合は**localのcore.hooksPathを設定せず、pnpm exec huskyも実行しません**。グローバルフックを保持し、Git共通hooksから現在のworktreeの`.husky`を呼びます。`.githooks`へ読み替えません。以下はGit rootで、共有hooksへの追加を許可され、両ファイルが未作成の場合だけ実行します。
 
 ```sh
-pnpm exec husky
+set -eu
+hooks="$(git rev-parse --path-format=absolute --git-common-dir)/hooks"
+mkdir -p "$hooks"
+for name in pre-commit pre-push; do
+  if test -e "$hooks/$name" || test -L "$hooks/$name"; then
+    echo "Existing hook: $hooks/$name — stop and inspect" >&2
+    exit 1
+  fi
+done
+set -C
+for name in pre-commit pre-push; do
+  printf '#!/bin/sh\nroot="$(git rev-parse --show-toplevel)" || exit 1\ncd "$root" || exit 1\nexport PATH="$root/node_modules/.bin:$PATH"\nexec sh "$root/.husky/%s" "$@"\n' "$name" > "$hooks/$name"
+  chmod +x "$hooks/$name"
+done
 ```
 
-これはローカルcore.hooksPathを変更し、.husky/_に内部ファイルを生成します。**.husky/_はGitへ追加せず、設定として配布する.husky/pre-commitと.husky/pre-pushはGitで管理します。** husky initによる既存フックの上書きは行いません。
+共有hooksは全worktreeに影響します。`.husky`の無いworktreeでは失敗するため、導入先と他worktreeへの影響を先に確認します。mainを固定参照するsymlinkは使いません。既存フックがある場合は内容を保った連携を別途設計し、上書き・削除しません。連携できない場合はsetupを未完了とし、直接検査だけでフック有効化済みと扱いません。
 
-commit前は変更ファイルの整形・Lint、push前はpnpm checkを実行し、不合格なら停止します。有効化後は許可されたローカルGit操作で検証し、設定と結果を読み戻します。テスト目的だけでGitHubへpushしません。
+### commit前・push前の検査と確認
 
-HuskyにはCIと同じ強制力はありません。未設定端末・GitHub上の直接編集・hookスキップでは保証できません。不合格をスキップで回避せず、実行結果と有効化状態を記録します。
+commit前は`node check-commit.mjs`が**pnpm check全体**を実行します。型→Lint→重複→類似度→書式→単体テスト→ビルドを検査し、3D用途は本番ビルド＋ブラウザE2Eも含みます。3D用途ではcommit時にもブラウザ導入済みの環境とPLAYWRIGHT_BROWSERS_PATHが必要です。push前にもpnpm checkを再実行します。
+
+検査した内容とcommit内容を揃えるため、未ステージの追跡ファイル変更と、ignoreされていない未追跡ファイルがあれば停止します。必要なファイルを先にstageし、不要なファイルは内容を確認して明示的にignoreします。自動stash・自動整形・自動stageはしません。`lint-staged.config.mjs`は任意の手動実行用でありcommitゲートには使いません。検査中に作業内容やindexが変わった場合も停止します。検査中は並行編集・stageを行わないでください。
+`assume-unchanged`・`skip-worktree`の付いたindexでは作業内容の不一致が隠れるため、commitゲートはそれらのフラグを検出して停止します。sparse checkoutもこのゲートでは未対応です。設定を勝手に解除せず、必要性を確認して利用側で明示的に整理します。
+
+有効化後はhooksPath・ラッパー内容・実行権限を読み戻します。許可された隔離Git環境で正常commitと不正commitを試し、不正時にHEADが不変であることを確認します。push拒否はローカルbare remoteで確認し、remote refが不変である証拠を残します。テストだけのためにGitHubへpushしません。
+
+Huskyと直接Git hooksはどちらもローカル検査です。未導入端末・GitHub上の直接編集・hookスキップを防ぐ強制力はありません。失敗をスキップで回避しません。GitHub側CI・必須チェックはこの設定の対象外です。
 
 ## 公式資料
 

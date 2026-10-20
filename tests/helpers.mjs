@@ -59,6 +59,17 @@ export async function copyPreset(
     errorOnExist: true,
   });
   if (dependencies) {
+    const toolDirectory = join(root, ".tools", "similarity");
+    await mkdir(toolDirectory, { recursive: true });
+    const binary =
+      process.platform === "win32" ? "similarity-ts.exe" : "similarity-ts";
+    await cp(
+      join(ROOT, ".tools", "similarity", binary),
+      join(toolDirectory, binary),
+      { force: false, errorOnExist: true },
+    );
+  }
+  if (dependencies) {
     const installed = runAt(root, "pnpm", [
       "install",
       "--ignore-scripts",

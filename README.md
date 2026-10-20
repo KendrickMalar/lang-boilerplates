@@ -18,6 +18,7 @@ Scaffoldは言語を選んだ後、当該言語のREADMEを読み、参照され
 ## このリポジトリの検証
 
 Node 24.15以上の24系またはNode26以上（Node25は対象外）、pnpm 12.6.0を使います。依存導入前に環境・権限を確認してください。
+保守試験でも、用途別READMEのsimilarity-ts導入手順に従い、固定版0.5.0とLICENSEをこのリポジトリの`.tools/similarity/`へ明示配置します。テストはこの検証済みバイナリを各fixtureへコピーします。未導入をskipや自動ダウンロードで回避しません。
 
 ```sh
 pnpm install --ignore-scripts --engine-strict --store-dir .verification/pnpm-store

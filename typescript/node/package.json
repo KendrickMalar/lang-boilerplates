@@ -11,11 +11,13 @@
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
+    "lint:duplicates": "node check-duplicates.mjs",
+    "lint:similarity": "node check-similarity.mjs",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build"
+    "check": "pnpm typecheck && pnpm lint && pnpm lint:duplicates && pnpm lint:similarity && pnpm format:check && pnpm test && pnpm build"
   },
   "devDependencies": {
     "typescript": "6.0.3",
@@ -27,6 +29,8 @@
     "eslint-config-prettier": "10.1.8",
     "husky": "9.1.7",
     "lint-staged": "17.6.0",
+    "jscpd": "5.4.1",
+    "oxc-parser": "0.73.2",
     "vitest": "5.0.3",
     "vite": "8.3.4",
     "tsx": "4.23.15",
