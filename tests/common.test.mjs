@@ -16,6 +16,11 @@ test("each leaf includes its own complete safe TypeScript configuration", () => 
       "tsconfig.json",
       "eslint.base.mjs",
       "eslint.config.mjs",
+      ".jscpd.json",
+      "check-commit.mjs",
+      "check-similarity.mjs",
+      "quality-sources.mjs",
+      "check-duplicates.mjs",
       ".prettierrc.json",
       ".prettierignore",
       ".editorconfig",
@@ -47,8 +52,8 @@ test("each leaf includes its own complete safe TypeScript configuration", () => 
     assert.equal(
       manifest.scripts.check,
       name === "web-game-3d"
-        ? "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm test:e2e:preview"
-        : "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build",
+        ? "pnpm typecheck && pnpm lint && pnpm lint:duplicates && pnpm lint:similarity && pnpm format:check && pnpm test && pnpm test:e2e:preview"
+        : "pnpm typecheck && pnpm lint && pnpm lint:duplicates && pnpm lint:similarity && pnpm format:check && pnpm test && pnpm build",
     );
     assert.equal(manifest.scripts.prepare, undefined);
     assert.equal(manifest.scripts.postinstall, undefined);

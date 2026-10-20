@@ -14,12 +14,12 @@ export function createConfig({
   if (environment !== "node" && environment !== "browser") {
     throw new Error("Choose node or browser for the ESLint environment.");
   }
-  const sourceFiles = ["**/*.{js,mjs,cjs,ts,tsx}"];
+  const sourceFiles = ["**/*.{js,mjs,cjs,ts,tsx,mts,cts}"];
   const nodeFiles = [
-    "*.config.{js,mjs,cjs,ts,tsx}",
-    "tests/**/*.{js,mjs,cjs,ts,tsx}",
-    "src/**/*.{test,spec}.{js,mjs,cjs,ts,tsx}",
-    "src/**/__tests__/**/*.{js,mjs,cjs,ts,tsx}",
+    "*.config.{js,mjs,cjs,ts,tsx,mts,cts}",
+    "tests/**/*.{js,mjs,cjs,ts,tsx,mts,cts}",
+    "src/**/*.{test,spec}.{js,mjs,cjs,ts,tsx,mts,cts}",
+    "src/**/__tests__/**/*.{js,mjs,cjs,ts,tsx,mts,cts}",
   ];
   const browserOnly = Object.keys(globals.browser).filter(
     (name) => !(name in globals.node),
@@ -30,6 +30,7 @@ export function createConfig({
         "node_modules/**",
         "dist/**",
         "coverage/**",
+        ".tools/**",
         ".husky/_/**",
         "test-results/**",
         "playwright-report/**",
@@ -42,7 +43,7 @@ export function createConfig({
       extends: [js.configs.recommended],
     },
     {
-      files: ["**/*.{ts,tsx}"],
+      files: ["**/*.{ts,tsx,mts,cts}"],
       extends: [
         js.configs.recommended,
         tseslint.configs.strictTypeChecked,
@@ -71,7 +72,7 @@ export function createConfig({
       languageOptions: { globals: globals.node },
     },
     {
-      files: ["src/**/*.{js,mjs,cjs,ts,tsx}"],
+      files: ["src/**/*.{js,mjs,cjs,ts,tsx,mts,cts}"],
       ignores: nodeFiles,
       languageOptions: {
         globals: environment === "browser" ? globals.browser : globals.node,
@@ -104,6 +105,20 @@ export function createConfig({
         ...vitest.configs.recommended.rules,
         "vitest/no-focused-tests": ["error", { fixable: false }],
         "vitest/no-disabled-tests": "error",
+      },
+    },
+    {
+      files: [
+        "src/**/*.{js,mjs,cjs,ts,tsx,mts,cts}",
+        "tests/**/*.{js,mjs,cjs,ts,tsx,mts,cts}",
+      ],
+      rules: {
+        complexity: ["error", { max: 10, variant: "classic" }],
+        "max-lines-per-function": [
+          "error",
+          { max: 50, skipBlankLines: true, skipComments: true, IIFEs: true },
+        ],
+        "max-depth": ["error", 3],
       },
     },
     prettier,

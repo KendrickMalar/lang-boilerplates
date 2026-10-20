@@ -26,8 +26,7 @@ function report(name: string, value: string): void {
   if (!output) throw new Error("Missing output " + name);
   output.textContent = value;
 }
-async function start(): Promise<void> {
-  await RAPIER.init();
+function createView() {
   const renderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
   renderer.setPixelRatio(1);
   document.body.append(renderer.domElement);
@@ -37,23 +36,34 @@ async function start(): Promise<void> {
   camera.position.set(0, 3, 6);
   const cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
   scene.add(cube);
+  return { renderer, scene, camera, cube };
+}
+function createPhysics() {
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   world.timestep = 1 / 60;
   const ground = world.createCollider(RAPIER.ColliderDesc.cuboid(10, 0.1, 10));
   const body = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(0, 3, 0));
   const collider = world.createCollider(RAPIER.ColliderDesc.cuboid(0.5, 0.5, 0.5), body);
+  return { world, ground, body, collider };
+}
+function watchViewport(renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera): THREE.Vector2 {
   const size = new THREE.Vector2();
   const resize = (): void => {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    renderer.setSize(width, height);
-    camera.aspect = width / height;
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.getDrawingBufferSize(size);
     report("viewport", size.x.toString() + "x" + size.y.toString());
   };
   resize();
   window.addEventListener("resize", resize);
+  return size;
+}
+async function start(): Promise<void> {
+  await RAPIER.init();
+  const { renderer, scene, camera, cube } = createView();
+  const { world, ground, body, collider } = createPhysics();
+  const size = watchViewport(renderer, camera);
   window.addEventListener("keydown", (event: KeyboardEvent) => {
     if (event.code === "ArrowRight") {
       const current = body.translation();

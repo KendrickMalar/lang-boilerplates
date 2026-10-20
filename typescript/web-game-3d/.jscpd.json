@@ -1,0 +1,10 @@
+{
+  "path": ["src"],
+  "pattern": "**/*.{js,mjs,cjs,ts,tsx,mts,cts}",
+  "ignore": ["**/*.{test,spec}.{js,mjs,cjs,ts,tsx,mts,cts}", "**/__tests__/**"],
+  "threshold": 0,
+  "minLines": 5,
+  "minTokens": 50,
+  "mode": "mild",
+  "reporters": ["console"]
+}

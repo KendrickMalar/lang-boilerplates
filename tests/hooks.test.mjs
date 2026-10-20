@@ -58,7 +58,9 @@ test("real push hook accepts valid code then rejects type errors without updatin
   const before = git(remote, ["rev-parse", "refs/heads/main"]);
   await write(root, "src/bad.ts", 'export const value: number = "bad";\n');
   git(root, ["add", "src/bad.ts"]);
-  git(root, ["commit", "-m", "type-error fixture"]);
+  const commit = runAt(root, "git", ["commit", "-m", "type-error fixture"]);
+  assert.notEqual(commit.status, 0, commit.output);
+  assert.match(commit.output, /TS2322/);
   const push = runAt(root, "git", ["push", "origin", "HEAD:main"]);
   await saveLog("push-rejected", push);
   assert.notEqual(push.status, 0, push.output);

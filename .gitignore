@@ -1,4 +1,5 @@
 node_modules/
 .verification/
+.tools/
 .superpowers/
 .DS_Store
