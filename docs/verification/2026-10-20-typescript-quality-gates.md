@@ -65,7 +65,7 @@ Prettierは変更した設定・JS/TS・README・テスト・計画を検査し�
 ## scaffold-profiles
 
 実行：`npm run generate`、`npm run check`、`npm run typecheck`、`npm test`。
-ログ：lang-boilerplates側の`.verification/logs/scaffold-after-review.log`。
+ログ：lang-boilerplates側の`.verification/logs/scaffold-repaired.log`と、実pre-commit経由の` .verification/logs/scaffold-commit.log`。
 
 ```text
 ok: 35 files
@@ -83,13 +83,14 @@ LSPの能動照会は5ファイルすべてinconclusiveでした。診断0件を
 
 別コンテキストのruntime reviewerとcontracts/tests reviewerが読み取り専用で確認しました。修正は親が行い、再現テストのRED→GREENと全suiteの再実行で検証しました。
 
-| 指摘                                                     | 判断・対応                                                                                                                                                                          | 判断が誤っていた場合の影響                                          |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| assume-unchanged/skip-worktreeで作業内容の不一致が隠れる | **修正**。indexフラグを前後で確認して拒否します。2種類とも修正前に不正commitが通り、修正後は拒否・HEAD不変を確認しました。                                                          | 未検査のstage済み内容がcommitされます。                             |
-| jscpdの既定1 MiB上限で大きなファイルが黙って除外される   | **修正**。製品ファイルを明示列挙し、実際の最大サイズをCLIへ渡します。新しいサイズ制限を勝手に設けず、1 MiB超の実ファイル2つで重複拒否を確認しました。                               | 大きな製品コードの重複を見逃します。                                |
-| .mts/.ctsの検査範囲が不一致                              | **重要と再判定して修正**。型・Lint・重複・単体探索・libraryの配布除外を揃えました。全4用途で.mts/.ctsを含む複雑度/長さ/深さの境界を、Node用途で両拡張子の実重複検出を確認しました。 | TypeScriptモジュールの一部だけ検査を逃れます。                      |
-| Scaffoldのtest A && test BがA欠落時にset -eで停止しない  | **重要と再判定して修正**。個別のtestへ分けました。実snippetの欠落ケースがRED→GREENです。                                                                                            | 存在しないフックへの共有wrapperを設置し、他worktreeにも影響します。 |
-| src自体がsymlinkの場合の検査                             | **追加で修正**。rootと入れ子のsource symlinkを拒否します。root symlinkの試験をRED→GREENとし、修正後は両scannerの拒否を確認しました。                                                | 指定範囲外のsourceを検査し、有効範囲を誤認します。                  |
+| 指摘                                                     | 判断・対応                                                                                                                                                                                                                                                                                                                                                          | 判断が誤っていた場合の影響                                          |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| assume-unchanged/skip-worktreeで作業内容の不一致が隠れる | **修正**。indexフラグを前後で確認して拒否します。2種類とも修正前に不正commitが通り、修正後は拒否・HEAD不変を確認しました。                                                                                                                                                                                                                                          | 未検査のstage済み内容がcommitされます。                             |
+| jscpdの既定1 MiB上限で大きなファイルが黙って除外される   | **修正**。製品ファイルを明示列挙し、実際の最大サイズをCLIへ渡します。新しいサイズ制限を勝手に設けず、1 MiB超の実ファイル2つで重複拒否を確認しました。                                                                                                                                                                                                               | 大きな製品コードの重複を見逃します。                                |
+| .mts/.ctsの検査範囲が不一致                              | **重要と再判定して修正**。型・Lint・重複・単体探索・libraryの配布除外を揃えました。全4用途で.mts/.ctsを含む複雑度/長さ/深さの境界を、Node用途で両拡張子の実重複検出を確認しました。                                                                                                                                                                                 | TypeScriptモジュールの一部だけ検査を逃れます。                      |
+| Scaffoldのtest A && test BがA欠落時にset -eで停止しない  | **重要と再判定して修正**。個別のtestへ分けました。実snippetの欠落ケースがRED→GREENです。                                                                                                                                                                                                                                                                            | 存在しないフックへの共有wrapperを設置し、他worktreeにも影響します。 |
+| src自体がsymlinkの場合の検査                             | **追加で修正**。rootと入れ子のsource symlinkを拒否します。root symlinkの試験をRED→GREENとし、修正後は両scannerの拒否を確認しました。                                                                                                                                                                                                                                | 指定範囲外のsourceを検査し、有効範囲を誤認します。                  |
+| Git hookから試験用GitへGIT_DIR等が漏れる                 | **修正・復元**。通常実行では合格していた試験が、実pre-commitでは元repoを参照し、core.bareをtrueに変えていました。本人の明示承認後、現在configを非公開で退避し、bareだけfalseへ復元しました。その他のbytes不変、mainのHEADと追跡ファイル不変を確認。新規テストでGIT_*を除去し、poisoned環境でRED→GREEN、実pre-commit経由でも115/115とcore.bare=falseを確認しました。 | 試験が利用者のGitメタデータを変更します。                           |
 
 # 5．検証できたこと・未検証のこと
 
@@ -125,3 +126,4 @@ LSPの能動照会は5ファイルすべてinconclusiveでした。診断0件を
 - 独立レビュー原文：`.verification/review/runtime.md`、`.verification/review/contracts.md`。
 - 2026-10-20：本人が上限・commit全体検査・Scaffold手順更新を承認。後にjscpdとsimilarity-tsの併用、固定版・ローカル導入・事前解析を追加承認。
 - 作業途中に相対パスの編集先とworktreeの不一致を検出しました。元の作業ツリーへ入った今回の追加だけを元bytes一致で復元し、それ以降は絶対パスを使用しました。mainの追跡ファイル差分はなく、元からあった未追跡ファイルは保持しています。
+- core.bare復元前の非公開バックアップ：`.verification/config-repair-MIS3Cw/config.before`。Git hookから渡された環境変数による試験時の漏れを示すREDログ：`.verification/logs/red-git-environment.log`。同じ不正なGIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILEを与えても、修正後の3ケースは成功しました。
