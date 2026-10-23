@@ -1,0 +1,13 @@
+{
+	"schema": 1,
+	"repository": "KendrickMalar/luau-similarity",
+	"version": "0.1.0",
+	"tag": "v0.1.0",
+	"target": "aarch64-apple-darwin",
+	"asset": "luau-similarity-v0.1.0-aarch64-apple-darwin.tar.gz",
+	"archive_sha256": "6d657aa2ef3b9022ea574b83756b80c8ed323e82487a95e2f69de42f1e385be8",
+	"binary_sha256": "01487746514f5b1ff9833431c7e1da8a54fa120594d82c1831d894ea07f64eab",
+	"source_commit": "74c403600eb7fda012297de0b0cae35bd639f8e4",
+	"mpl_source_asset": "luau-similarity-v0.1.0-mpl-sources.tar.gz",
+	"mpl_source_sha256": "1978ed379d143a6f49a6b6d4ecbdb7257ab41e35965a4d3348c20fed38a428d7"
+}

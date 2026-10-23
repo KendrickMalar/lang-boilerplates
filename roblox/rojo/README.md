@@ -8,38 +8,46 @@ Wally **0.3.2**。製品 source、`roblox.yml`、`wally.lock`、fixture/cache �
 
 プロジェクト root へ次を同じ相対位置で導入します（親/兄弟設定は不要）。
 
-| コピー元 | コピー先 |
-| --- | --- |
-| [rokit.toml](rokit.toml) | `rokit.toml` |
-| [default.project.json](default.project.json) | `default.project.json`（`name` を製品に合わせる） |
-| [wally.toml](wally.toml) | `wally.toml`（`name` を製品に合わせる） |
-| [stylua.toml](stylua.toml) | `stylua.toml` |
-| [selene.toml](selene.toml) | `selene.toml` |
-| [.luaurc](.luaurc) | `.luaurc` |
-| [.editorconfig](.editorconfig) | `.editorconfig` |
-| [.gitignore](.gitignore) | `.gitignore` |
-| [src/server/.gitkeep](src/server/.gitkeep) | `src/server/.gitkeep` |
-| [src/client/.gitkeep](src/client/.gitkeep) | `src/client/.gitkeep` |
-| [src/shared/.gitkeep](src/shared/.gitkeep) | `src/shared/.gitkeep` |
-| [tests/.gitkeep](tests/.gitkeep) | `tests/.gitkeep` |
-| [scripts/check.sh](scripts/check.sh) | `scripts/check.sh` |
-| [scripts/test.luau](scripts/test.luau) | `scripts/test.luau` |
-| [.githooks/pre-commit](.githooks/pre-commit) | `.githooks/pre-commit` |
-| [.githooks/pre-push](.githooks/pre-push) | `.githooks/pre-push` |
-| [LICENSE](LICENSE) | `LICENSE.lang-boilerplates` |
-| この README | 参照用。製品 README を上書きしない |
+| コピー元                                                         | コピー先                                          |
+| ---------------------------------------------------------------- | ------------------------------------------------- |
+| [rokit.toml](rokit.toml)                                         | `rokit.toml`                                      |
+| [default.project.json](default.project.json)                     | `default.project.json`（`name` を製品に合わせる） |
+| [wally.toml](wally.toml)                                         | `wally.toml`（`name` を製品に合わせる）           |
+| [stylua.toml](stylua.toml)                                       | `stylua.toml`                                     |
+| [selene.toml](selene.toml)                                       | `selene.toml`                                     |
+| [.luaurc](.luaurc)                                               | `.luaurc`                                         |
+| [.editorconfig](.editorconfig)                                   | `.editorconfig`                                   |
+| [.gitignore](.gitignore)                                         | `.gitignore`                                      |
+| [src/server/.gitkeep](src/server/.gitkeep)                       | `src/server/.gitkeep`                             |
+| [src/client/.gitkeep](src/client/.gitkeep)                       | `src/client/.gitkeep`                             |
+| [src/shared/.gitkeep](src/shared/.gitkeep)                       | `src/shared/.gitkeep`                             |
+| [tests/.gitkeep](tests/.gitkeep)                                 | `tests/.gitkeep`                                  |
+| [scripts/check.sh](scripts/check.sh)                             | `scripts/check.sh`                                |
+| [scripts/test.luau](scripts/test.luau)                           | `scripts/test.luau`                               |
+| [luau-similarity.lock.json](luau-similarity.lock.json)           | `luau-similarity.lock.json`                       |
+| [scripts/.luaurc](scripts/.luaurc)                               | `scripts/.luaurc`                                 |
+| [scripts/similarity.luau](scripts/similarity.luau)               | `scripts/similarity.luau`                         |
+| [scripts/setup-similarity.luau](scripts/setup-similarity.luau)   | `scripts/setup-similarity.luau`                   |
+| [scripts/verify-similarity.luau](scripts/verify-similarity.luau) | `scripts/verify-similarity.luau`                  |
+| [scripts/check-git.luau](scripts/check-git.luau)                 | `scripts/check-git.luau`                          |
+| [scripts/git-state.luau](scripts/git-state.luau)                 | `scripts/git-state.luau`                          |
+| [scripts/test-helpers.luau](scripts/test-helpers.luau)           | `scripts/test-helpers.luau`                       |
+| [.githooks/pre-commit](.githooks/pre-commit)                     | `.githooks/pre-commit`                            |
+| [.githooks/pre-push](.githooks/pre-push)                         | `.githooks/pre-push`                              |
+| [LICENSE](LICENSE)                                               | `LICENSE.lang-boilerplates`                       |
+| この README                                                      | 参照用。製品 README を上書きしない                |
 
 コピー前に既存ファイル・symlink・Git hooksPath/フックを読み取り、差分を提示して承認を得てください。
 無条件の一括コピーは行いません。製品のライセンスは変更しません。
 
 Rojo の配置は次の通りです。`Packages` は optional なので、`wally install` 前でも build できます。
 
-| ファイル | Roblox 上の配置 |
-| --- | --- |
-| `src/server` | `ServerScriptService.Server` |
+| ファイル     | Roblox 上の配置                             |
+| ------------ | ------------------------------------------- |
+| `src/server` | `ServerScriptService.Server`                |
 | `src/client` | `StarterPlayer.StarterPlayerScripts.Client` |
-| `src/shared` | `ReplicatedStorage.Shared` |
-| `Packages` | `ReplicatedStorage.Packages` |
+| `src/shared` | `ReplicatedStorage.Shared`                  |
+| `Packages`   | `ReplicatedStorage.Packages`                |
 
 ## tool と定義ファイル
 
@@ -57,23 +65,51 @@ Rojo の配置は次の通りです。`Packages` は optional なので、`wally
    `[dev-dependencies]` を使う場合は、`default.project.json`・`.gitignore`・check.sh を製品側で
    拡張してください。未拡張のまま書くと check.sh は止まります。
 5. Roblox の型定義は、初回の typecheck で luau-lsp 1.69.0 タグの `globalTypes.d.luau` を取得し、
-   SHA256 を照合して `.luau-lsp-cache/` に保存します。これがチェック唯一のネットワーク接続です。
+   SHA256 を照合して `.luau-lsp-cache/` に保存します。これは既存typecheckのnetwork接続です。similarity段階はnetworkを使いません。
+
+## private similarity CLI の明示導入
+
+`luau-similarity 0.1.0` を必須にします。初版は Apple Silicon macOS のみです。
+private repo `KendrickMalar/luau-similarity` への閲覧権限と既存のGitHub CLI認証が必要です。
+Rokitや検査中に取得せず、保存先と利用権限を確認して別途承認後に実行します。
+
+```sh
+lune run scripts/setup-similarity.luau
+lune run scripts/verify-similarity.luau
+```
+
+setupだけがgithub.comの固定repo/tag/assetへ接続します。`GH_HOST`では宛先を変更できません。
+token値を表示・保存しません。認証・権限不足は失敗し、公開mirrorや別の認証先へ迂回しません。
+lockはReleaseRecordのarchive/binary SHA256とsource commitを固定します。
+新規の `.tools/luau-similarity/` にだけ配置し、既存の未知file・symlink・不完全なdirectoryを
+削除・上書きしません。失敗時の部分成果も残すので、内容を確認してから再開を相談してください。
+同じ正常な導入済みdirectoryは照合のみで、再取得・書換えしません。
+
+Lune 0.10.5に内蔵された型宣言も、専用HOME/cwdで生成して `.tools/` 内へ置きます。
+利用者のHOME・既存 `.luaurc` は変更しません。型宣言の生成はnetworkを使いません。
+verifyはローカルのhash・版・所有記録を照合するだけです。未導入・改変・版違いを許容しません。
+実CLIにはRust/Node/Python/Javaは不要です。この設定の検査は既存LuneとOS標準toolを使います。
+
+CLIの自作部分は一般向け再配布許諾がありません。このboilerplateのMITとは別です。
+CLI archive内のLICENSE・third-party noticesを維持し、MPL sourceは同じprivate Releaseの
+`luau-similarity-v0.1.0-mpl-sources.tar.gz` から取得できます。`.tools/` はGit管理しません。
 
 ## チェック
 
 ```sh
 sh scripts/check.sh all
-sh scripts/check.sh format # format|lint|typecheck|test|build|all
+sh scripts/check.sh format # format|lint|typecheck|test|build|similarity|all
 ```
 
-| 段階 | コマンド |
-| --- | --- |
-| 事前確認 | `rokit.toml` の各 tool が PATH にあり `--version` が一致するか |
-| format | `stylua --check src tests scripts`（書換えなし） |
-| lint | `selene src tests scripts`（警告も不合格） |
-| typecheck | `rojo sourcemap` → 型定義の取得・SHA256 照合 → `luau-lsp analyze --platform=roblox`（strict） |
-| test | `lune run scripts/test.luau` |
-| build | `rojo build` で一時ディレクトリに place を出力し、確認後に削除 |
+| 段階       | コマンド                                                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 事前確認   | `rokit.toml` の各 tool が PATH にあり `--version` が一致するか                                                                       |
+| format     | `stylua --check src tests scripts`（書換えなし）                                                                                     |
+| lint       | `selene src tests scripts`（警告も不合格）                                                                                           |
+| typecheck  | `rojo sourcemap` → 型定義の取得・SHA256 照合 → `luau-lsp analyze --platform=roblox`（strict）→ Lune helpersをstandard platformで解析 |
+| test       | helper純粋unit試験（Git hookの再帰なし）→ `lune run scripts/test.luau`                                                               |
+| build      | `rojo build` で一時ディレクトリに place を出力し、確認後に削除                                                                       |
+| similarity | ローカルCLIで `src --threshold 0.90 --min-nodes 50 --fail-on-similar`                                                                |
 
 最初の失敗で停止します（成功0、不合格非0）。次の場合も非0です: tool 不在・版違い、`src` に
 `.luau` が無い、`roblox.yml` が無い、`wally.toml` に依存があるのに `Packages/` が無い、
@@ -136,9 +172,28 @@ chmod +x .githooks/pre-commit .githooks/pre-push
 git config --local core.hooksPath .githooks
 ```
 
-pre-commit は `sh scripts/check.sh format` と `lint`、pre-push は `sh scripts/check.sh all` を
-実行し、不合格は非0で commit/push を止めます。IDE の Git にも同じ PATH が必要です。
+pre-commit／pre-pushの両方が `lune run scripts/check-git.luau commit|push` を通り、
+format → lint → typecheck → test → build → similarityを毎回すべて実行します。
+不合格は非0でcommit/pushを止めます。IDEのGitにも同じPATHが必要です。
 GitHub への試験 push、global Git 設定変更、`--no-verify` による回避は行いません。
+
+### Git guardの範囲
+
+未stage／未追跡／assume-unchanged／skip-worktree、ignoredなruntime/helper sourceを拒否します。
+検査に必要な設定とhelperもstage／追跡が必要です。tracked symlink／submoduleは未対応として止めます。
+Git rootとhook自身のproject rootが違う場合も拒否します。
+実効index bytes／staged内容／tracked file bytes／HEADを検査前後に照合します。
+自動stash・stage・復元・自動formatは行いません。検査中変更を見つけても変更は消しません。
+
+pushはclean HEADを要求し、stdinの各更新refとSHAが検査したHEADと同じcommitへ解決できるか確認します。
+別commit・削除・解決不能ref・空の更新入力は拒否します。
+HEAD、branch、tag、完全SHAを使うpushでも、対象commitがHEADと違えば不合格です。
+同じcommitを再pushする更新なしの操作は、空入力として止まる場合があります。
+前後照合は全瞬間の監視や悪意ある同一ユーザーによる全競合の防御を保証するものではありません。
+
+global dispatcherがある場合も、そのままhooksPathを上書きしないでください。
+common Git directoryの既存hookから、現在のworktreeの `.githooks/` へ渡す承認済みbridgeを
+用いる方式を隔離fixtureで確認しています。実環境の連結は既存内容を読み、別途承認を得ます。
 
 ## 検証範囲
 
