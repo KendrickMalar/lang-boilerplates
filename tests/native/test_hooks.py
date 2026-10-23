@@ -122,7 +122,10 @@ def exercise_git_gates(test: unittest.TestCase, platform: str, inputs):
     original_source, original_test = source.read_bytes(), test_source.read_bytes()
     try:
         run(['init', '-q'])
-        run(['add', '--', str(source.relative_to(root)), str(test_source.relative_to(root))])
+        if platform == 'roblox':
+            run(['add', '.'])  # Full gate requires the complete configuration and source index.
+        else:
+            run(['add', '--', str(source.relative_to(root)), str(test_source.relative_to(root))])
         # Existing inherited hook is not overwritten; opt-in requires separate permission.
         run(['commit', '-qm', 'existing hook refuses activation'], success=False)
         test.assertEqual(existing.read_text(), '#!/bin/sh\nexit 23\n')
@@ -161,6 +164,15 @@ def exercise_git_gates(test: unittest.TestCase, platform: str, inputs):
         # Formatter-only commit accepts a formatted failing test; full push rejects it.
         test_source.write_text(bad_test)
         run(['add', '--', str(test_source.relative_to(root))])
+        if platform == 'roblox':
+            run(['commit', '-qm', 'formatted failing test'], success=False)
+            test.assertIn('FAIL tests/Greeting.spec.luau', receipts[-1]['stdout'] + receipts[-1]['stderr'])
+            test.assertEqual(run(['rev-parse', 'HEAD']), head)
+            run(['push', str(remote), 'HEAD:refs/heads/rejected'], success=False)
+            test.assertEqual(remote_head(), head)
+            test_source.write_bytes(original_test)
+            run(['add', '--', str(test_source.relative_to(root))])
+            return  # No bad commit exists; unlike formatter-only platforms there is nothing to restore.
         run(['commit', '-qm', 'formatted failing test'])
         bad_head = run(['rev-parse', 'HEAD'])
         test.assertNotEqual(bad_head, head)

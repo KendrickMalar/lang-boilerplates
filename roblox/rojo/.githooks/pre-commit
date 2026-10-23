@@ -1,7 +1,8 @@
 #!/bin/sh
-# Manual opt-in only. Run the same gate as the project-local check.
+# Manual opt-in only. Preserve stdin for push ref validation.
 set -eu
-root=$(git rev-parse --show-toplevel)
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+git_root=$(git rev-parse --show-toplevel)
+[ "$root" = "$git_root" ] || { printf '%s\n' 'error: hook and Git project root differ' >&2; exit 1; }
 cd "$root"
-sh scripts/check.sh format
-exec sh scripts/check.sh lint
+exec lune run scripts/check-git.luau commit

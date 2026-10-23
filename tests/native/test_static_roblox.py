@@ -51,7 +51,10 @@ class StaticRobloxTests(unittest.TestCase):
         self.assertNotIn("wally.lock", ignored)
         self.assertNotIn("roblox.yml", ignored)
         luau = sorted(p.relative_to(LEAF).as_posix() for p in LEAF.rglob("*.luau"))
-        self.assertEqual(luau, ["scripts/test.luau"], "only the test runner is distributed")
+        expected = ["scripts/check-git.luau", "scripts/git-state.luau", "scripts/setup-similarity.luau",
+                    "scripts/similarity.luau", "scripts/test-helpers.luau", "scripts/test.luau",
+                    "scripts/verify-similarity.luau"]
+        self.assertEqual(luau, expected, "only quality helpers, never product/game source or fixtures")
         for name in ["roblox.yml", "wally.lock", "sourcemap.json"]:
             self.assertFalse((LEAF / name).exists(), name)
         for empty in ["src/server", "src/client", "src/shared", "tests"]:

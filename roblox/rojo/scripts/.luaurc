@@ -1,0 +1,7 @@
+{
+    "languageMode": "strict",
+    "lintErrors": true,
+    "aliases": {
+        "lune": "../.tools/luau-similarity/lune-types"
+    }
+}

@@ -3,6 +3,8 @@ local fs = require("@lune/fs")
 local process = require("@lune/process")
 
 local SUFFIX = ".spec.luau"
+-- Dynamic spec paths cannot be resolved statically; each loaded value is validated below.
+local loadSpec = require :: (string) -> any
 
 local function collect(dir: string, out: { string })
 	if not fs.isDir(dir) then
@@ -27,7 +29,7 @@ for _, file in files do
 	-- Paths resolve relative to this script; the extension is omitted.
 	local modulePath = "../" .. string.sub(file, 1, -#".luau" - 1)
 	local loaded, suite = pcall(function()
-		return require(modulePath)
+		return loadSpec(modulePath)
 	end)
 	if not loaded or type(suite) ~= "table" then
 		failed += 1

@@ -24,6 +24,9 @@ ROBLOX_FILES = {'README.md', 'LICENSE', '.editorconfig', '.gitignore', 'rokit.to
                 'default.project.json', 'wally.toml', 'stylua.toml', 'selene.toml', '.luaurc',
                 'src/server/.gitkeep', 'src/client/.gitkeep', 'src/shared/.gitkeep',
                 'tests/.gitkeep', 'scripts/check.sh', 'scripts/test.luau',
+                'luau-similarity.lock.json', 'scripts/.luaurc', 'scripts/similarity.luau',
+                'scripts/setup-similarity.luau', 'scripts/verify-similarity.luau', 'scripts/check-git.luau',
+                'scripts/git-state.luau', 'scripts/test-helpers.luau',
                 '.githooks/pre-commit', '.githooks/pre-push'}
 GODOT_FILES = {'README.md', 'LICENSE', '.editorconfig', '.gitignore', '.gitattributes',
                'project.godot', 'gdlintrc', 'gdformatrc', 'src/.gitkeep', 'tests/.gitkeep',
@@ -74,7 +77,14 @@ class CatalogTests(unittest.TestCase):
                         self.assertTrue(path.is_relative_to(dest.resolve()))
                         self.assertTrue(path.is_file())
                 for hook in ['pre-commit', 'pre-push']:
-                    self.assertIn('scripts/check.sh', (dest / '.githooks' / hook).read_text())
+                    if name == 'roblox/rojo':
+                        mode = 'commit' if hook == 'pre-commit' else 'push'
+                        self.assertIn('exec lune run scripts/check-git.luau ' + mode,
+                                      (dest / '.githooks' / hook).read_text().splitlines())
+                        self.assertTrue((dest / 'scripts/check-git.luau').is_file())
+                        # Actual downstream all-stage execution is covered by LuauGitGateTests.
+                    else:
+                        self.assertIn('scripts/check.sh', (dest / '.githooks' / hook).read_text())
                     self.assertTrue((dest / 'scripts/check.sh').is_file())
 
     def test_explicit_nonempty_suites_preserve_typescript_entry(self):

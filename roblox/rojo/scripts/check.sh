@@ -5,8 +5,8 @@ fail() { printf '%s\n' "error: $*" >&2; exit 1; }
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 stage=${1:-all}
-[ "$#" -le 1 ] || fail 'usage: check.sh [format|lint|typecheck|test|build|all]'
-case "$stage" in format|lint|typecheck|test|build|all) ;; *) fail "unknown stage: $stage" ;; esac
+[ "$#" -le 1 ] || fail 'usage: check.sh [format|lint|typecheck|test|build|similarity|all]'
+case "$stage" in format|lint|typecheck|test|build|similarity|all) ;; *) fail "unknown stage: $stage" ;; esac
 DEFS_URL='https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/1.69.0/scripts/globalTypes.d.luau'
 DEFS_SHA256='7db9cd4fe55a4d26f3f7d5a39b6279a376f95a6c055c71d5591c26a1d525aaf2'
 DEFS=.luau-lsp-cache/globalTypes-1.69.0.d.luau
@@ -67,6 +67,9 @@ ensure_defs() {
     [ "$(sha256 "$DEFS")" = "$DEFS_SHA256" ] || fail "type definitions SHA256 mismatch: $DEFS (delete it to refetch)"
 }
 
+case "$stage" in
+    all|similarity) lune run scripts/verify-similarity.luau ;;
+esac
 run_stage() {
     printf '%s\n' "stage: $1"
     case "$1" in
@@ -77,18 +80,23 @@ run_stage() {
             rojo sourcemap default.project.json --output sourcemap.json
             luau-lsp analyze --platform=roblox --sourcemap=sourcemap.json \
                 --definitions=@roblox="$DEFS" --ignore='Packages/**' src tests
+            luau-lsp analyze --platform=standard --ignore='.tools/**' scripts
             ;;
-        test) lune run scripts/test.luau ;;
+        test)
+            lune run scripts/test-helpers.luau
+            lune run scripts/test.luau
+            ;;
         build)
             out=$(mktemp -d)
             if ! rojo build default.project.json --output "$out/place.rbxl"; then rm -rf "$out"; exit 1; fi
             [ -s "$out/place.rbxl" ] || { rm -rf "$out"; fail 'rojo build produced no place file'; }
             rm -rf "$out"
             ;;
+        similarity) lune run scripts/verify-similarity.luau check ;;
     esac
 }
 if [ "$stage" = all ]; then
-    for step in format lint typecheck test build; do run_stage "$step"; done
+    for step in format lint typecheck test build similarity; do run_stage "$step"; done
 else
     run_stage "$stage"
 fi
