@@ -28,8 +28,10 @@ Husky は Git root に1つだけ置き、複数言語の検査を root の check
 Node 24.15以上の24系またはNode26以上（Node25は対象外）、pnpm 12.6.0を使います。依存導入前に環境・権限を確認してください。
 保守試験でも、用途別READMEのsimilarity-ts導入手順に従い、固定版0.5.0とLICENSEをこのリポジトリの`.tools/similarity/`へ明示配置します。テストはこの検証済みバイナリを各fixtureへコピーします。未導入をskipや自動ダウンロードで回避しません。
 
+依存は worktree ごとに導入します。ルートの導入では `--store-dir` を付けず、pnpm の共通ストア（`pnpm store path`）を使います。2つ目以降の worktree はストアから複製またはハードリンクで取り込むため、再ダウンロードしません。テストが fixture へ依存を入れるときは、引き続き `.verification/pnpm-store` を使って隔離します。
+
 ```sh
-pnpm install --ignore-scripts --engine-strict --store-dir .verification/pnpm-store
+pnpm install --frozen-lockfile --ignore-scripts --engine-strict
 PLAYWRIGHT_BROWSERS_PATH="$PWD/.verification/playwright" pnpm exec playwright install chromium --only-shell
 pnpm test
 ```
