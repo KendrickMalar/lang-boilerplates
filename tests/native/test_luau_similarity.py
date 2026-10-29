@@ -229,10 +229,14 @@ class LuauGitGateTests(unittest.TestCase):
         env.update(GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1",
                    GIT_AUTHOR_NAME="Fixture", GIT_AUTHOR_EMAIL="fixture@example.invalid",
                    GIT_COMMITTER_NAME="Fixture", GIT_COMMITTER_EMAIL="fixture@example.invalid")
-        for args in [("init", "-q", "--initial-branch=feat/fixture"),
-                     ("config", "--local", "core.hooksPath", str(root / ".githooks"))]:
-            result = self.git_run(root, env, *args)
-            self.assertEqual(result.returncode, 0, result.stderr)
+        from tests.native.test_hooks import install_husky_dependencies
+        result = self.git_run(root, env, "init", "-q", "--initial-branch=feat/fixture")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        node = install_husky_dependencies(root, env)
+        installed = subprocess.run([node, str(ROOT / "node_modules/husky/bin.js")],
+                                   cwd=root, env=env, text=True, capture_output=True)
+        self.assertEqual(installed.returncode, 0, installed.stdout + installed.stderr)
+        self.assertEqual(self.git_run(root, env, "config", "--local", "--get", "core.hooksPath").stdout.strip(), ".husky/_")
         (root / "README.fixture").write_text("baseline\n")
         self.assertEqual(self.git_run(root, env, "add", ".").returncode, 0)
         return root, env
@@ -255,7 +259,7 @@ class LuauGitGateTests(unittest.TestCase):
         self.assertEqual(self.git_run(root, env, "add", "another.txt").returncode, 0)
         result = self.git_run(root, env, "commit", "-m", "must reject")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("hidden", result.stdout + result.stderr)
+        self.assertTrue("hidden" in result.stdout + result.stderr or "index flags" in result.stdout + result.stderr, result.stdout + result.stderr)
         self.assertEqual(self.git_run(root, env, "rev-parse", "HEAD").stdout, head)
         self.assertEqual((root / "README.fixture").read_text(), "hidden change\n")
 
@@ -264,7 +268,7 @@ class LuauGitGateTests(unittest.TestCase):
     def test_hook_from_another_project_cannot_execute_its_cwd(self):
         source, _ = self.git_fixture()
         other, env = self.git_fixture()
-        result = subprocess.run([str(source / ".githooks/pre-commit")], cwd=other, env=env,
+        result = subprocess.run(["sh", str(source / ".husky/pre-commit")], cwd=other, env=env,
                                 text=True, capture_output=True, check=False)
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("project root", result.stdout + result.stderr)
@@ -379,7 +383,7 @@ class LuauGitGateTests(unittest.TestCase):
             self.assertTrue(source.is_file(), "global dispatcher hook prerequisite missing")
             shutil.copy2(source, fake_global / name)
             bridge = root / ".git/hooks" / name
-            bridge.write_text('#!/bin/sh\nroot=$(git rev-parse --show-toplevel)\nexec "$root/.githooks/' + name + '" "$@"\n')
+            bridge.write_text('#!/bin/sh\nroot=$(git rev-parse --show-toplevel)\ncd "$root" || exit 1\nexec sh "$root/.husky/' + name + '" "$@"\n')
             bridge.chmod(0o700)
         config = root.parent / "global.gitconfig"
         config.write_text("[core]\n    hooksPath = " + str(fake_global) + "\n")
@@ -395,6 +399,8 @@ class LuauGitGateTests(unittest.TestCase):
                      linked / ".luau-lsp-cache/globalTypes-1.69.0.d.luau")
         linked_env = roblox_env(linked)
         linked_env.update({key: value for key, value in env.items() if key.startswith("GIT_")})
+        from tests.native.test_hooks import install_husky_dependencies
+        install_husky_dependencies(linked, linked_env)
         (linked / "linked.txt").write_text("linked worktree\n")
         self.assertEqual(self.git_run(linked, linked_env, "add", "linked.txt").returncode, 0)
         result = self.git_run(linked, linked_env, "commit", "-m", "linked full gate")

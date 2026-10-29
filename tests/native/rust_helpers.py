@@ -68,13 +68,13 @@ def run_rust(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
 
 def _rust_input_hashes(cwd: Path) -> dict[str, str]:
     # Capture arbitrary nested source/config inputs, pruning outputs before traversal.
-    paths = [cwd / name for name in ("rust-toolchain.toml", "rustfmt.toml", ".editorconfig", ".gitignore")]
+    paths = [cwd / name for name in ("rust-toolchain.toml", "rustfmt.toml", ".editorconfig", ".gitignore", "package.json", "pnpm-workspace.yaml", ".node-version", "check-commit.mjs")]
     # Only Cargo/Tauri output paths are excluded; names inside sources are inputs.
     generated = {cwd / "src-tauri" / "target", cwd / "src-tauri" / "gen"}
-    for name in ("src-tauri", ".cargo", "scripts", ".githooks", "dist"):
+    for name in ("src-tauri", ".cargo", "scripts", ".husky", "dist"):
         for directory, children, files in os.walk(cwd / name):
             children[:] = [child for child in children
-                           if child != ".git" and Path(directory) / child not in generated]
+                           if child not in (".git", "_") and Path(directory) / child not in generated]
             paths.extend(Path(directory) / file for file in files)
     return {str(path.relative_to(cwd)): _sha256(path) for path in sorted(paths) if path.is_file()}
 

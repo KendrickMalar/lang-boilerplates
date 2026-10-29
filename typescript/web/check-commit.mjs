@@ -55,6 +55,8 @@ try {
   ]);
   const check = spawnSync("pnpm", ["check"], {
     stdio: "inherit",
+    // pnpm injects false into nested scripts; re-enable the outer Git gate explicitly.
+    env: { ...process.env, pnpm_config_verify_deps_before_run: "error" },
     shell: process.platform === "win32",
   });
   if (check.error || check.status !== 0) {

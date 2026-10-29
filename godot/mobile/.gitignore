@@ -4,3 +4,7 @@
 /.verification/
 .DS_Store
 # export_presets.cfg belongs in the consuming project repository.
+
+# Husky tooling (lockfile remains tracked)
+/node_modules/
+/.husky/_/

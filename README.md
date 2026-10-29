@@ -15,6 +15,14 @@ Scaffoldでプロジェクトを作る際に参照する、言語別の設定と
 
 Scaffoldは言語を選んだ後、当該言語のREADMEを読み、参照された設定ファイルと導入条件を確認します。各用途は親/兄弟設定に依存せず自己完結します。
 
+## 全言語共通の Git フック
+
+全言語・全用途で Husky **9.1.7** を必須にし、commit / push 前にテストを含む全体検査を実行します。
+Node は24.15以上の24系または26以上（25は対象外）、pnpm **12.6.0** を使います。
+Husky は Git root に1つだけ置き、複数言語の検査を root の check に集約します。
+依存 install とフック有効化は別手順です。既存フック・global hooksPath を無断で置き換えません。
+製品へのコピー・統合・明示有効化の詳細は各 leaf README に従います。既存プロジェクトへ自動適用しません。
+
 ## このリポジトリの検証
 
 Node 24.15以上の24系またはNode26以上（Node25は対象外）、pnpm 12.6.0を使います。依存導入前に環境・権限を確認してください。
@@ -29,6 +37,14 @@ pnpm test
 TypeScript の自己完結した4用途ディレクトリの構造、選択ディレクトリだけをコピーした後の型チェック・Lint・整形・テスト・ビルド、正常系と異常系、実Gitフックを検証します。fixtureとログは `.verification/` に生成し、Gitへ追加しません。テストはsynthetic HOMEとローカルbare remoteを使い、ユーザーのグローバルGitフックを変更せず、GitHubへ試験pushしません。
 
 推移依存はルートpnpm-lock.yamlで固定します。型定義とLintの対応範囲やpnpmの依存安全設定を変更したら、4用途を再検証してください。
+
+## Husky 移行の検証
+
+`pnpm test:husky` は実 Git・Husky・ローカル bare remote で各 native leaf の拒否動作を検証します。
+遅い native compiler/test command だけを代替しており、Swift/Rust/Godot/Blender の実 build/test 成功とは別です。
+`LUNE_BIN=/approved/path/to/lune pnpm test:husky:luau` は既存 Lune 0.10.5 で、
+Husky・Node関連入力が Git に追跡されていないと Roblox の実 snapshot が拒否することを検証します。
+Luneや各言語toolのインストールは行いません。compiler/Studio/Xcode/実機を使う確認は従来のnative suiteで別途行います。
 
 ## Native の保守検証（明示実行）
 

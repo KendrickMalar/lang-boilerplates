@@ -4,3 +4,7 @@ DerivedData/
 *.xcresult
 xcuserdata/
 *.xcuserstate
+
+# Husky tooling (lockfile remains tracked)
+/node_modules/
+/.husky/_/
