@@ -86,8 +86,12 @@ local REQUIRED = {
 	"scripts/check-git.luau",
 	"scripts/test-helpers.luau",
 	"scripts/git-state.luau",
-	".githooks/pre-commit",
-	".githooks/pre-push",
+	".husky/pre-commit",
+	".husky/pre-push",
+	"package.json",
+	"pnpm-workspace.yaml",
+	"pnpm-lock.yaml",
+	"check-commit.mjs",
 }
 
 function Git.snapshot(push: boolean): Snapshot

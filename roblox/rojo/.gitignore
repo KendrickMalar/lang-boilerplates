@@ -7,3 +7,7 @@
 /.tools/
 .DS_Store
 # wally.lock and roblox.yml belong in the consuming project repository.
+
+# Husky tooling (lockfile remains tracked)
+/node_modules/
+/.husky/_/

@@ -10,16 +10,17 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+HUSKY_FILES = {'package.json', 'pnpm-workspace.yaml', '.node-version', 'check-commit.mjs'}
 RUST_FILES = {'README.md', 'LICENSE', 'rust-toolchain.toml', 'rustfmt.toml',
               '.editorconfig', '.gitignore', '.cargo/config.toml', 'scripts/check.sh',
               'scripts/check.ps1', 'src-tauri/Cargo.toml', 'src-tauri/build.rs',
               'src-tauri/tauri.conf.json', 'src-tauri/capabilities/main.json',
-              '.githooks/pre-commit', '.githooks/pre-push'}
+              '.husky/pre-commit', '.husky/pre-push'}
 SWIFT_FILES = {'README.md', 'LICENSE', '.swift-format', '.swiftlint.yml',
                '.editorconfig', '.gitignore', 'Config/Quality.xcconfig',
                'Config/Debug.xcconfig', 'Config/Release.xcconfig',
                'Config/VerifyUnsigned.xcconfig', 'scripts/check.sh',
-               '.githooks/pre-commit', '.githooks/pre-push'}
+               '.husky/pre-commit', '.husky/pre-push'}
 ROBLOX_FILES = {'README.md', 'LICENSE', '.editorconfig', '.gitignore', 'rokit.toml',
                 'default.project.json', 'wally.toml', 'stylua.toml', 'selene.toml', '.luaurc',
                 'src/server/.gitkeep', 'src/client/.gitkeep', 'src/shared/.gitkeep',
@@ -27,14 +28,14 @@ ROBLOX_FILES = {'README.md', 'LICENSE', '.editorconfig', '.gitignore', 'rokit.to
                 'luau-similarity.lock.json', 'scripts/.luaurc', 'scripts/similarity.luau',
                 'scripts/setup-similarity.luau', 'scripts/verify-similarity.luau', 'scripts/check-git.luau',
                 'scripts/git-state.luau', 'scripts/test-helpers.luau',
-                '.githooks/pre-commit', '.githooks/pre-push'}
+                '.husky/pre-commit', '.husky/pre-push'}
 GODOT_FILES = {'README.md', 'LICENSE', '.editorconfig', '.gitignore', '.gitattributes',
                'project.godot', 'gdlintrc', 'gdformatrc', 'src/.gitkeep', 'tests/.gitkeep',
                'scripts/check.sh', 'scripts/test_runner.gd', 'scripts/test_context.gd',
-               '.githooks/pre-commit', '.githooks/pre-push'}
+               '.husky/pre-commit', '.husky/pre-push'}
 BLENDER_FILES = {'README.md', 'LICENSE', '.editorconfig', '.gitignore', 'pyproject.toml',
                  'models/.gitkeep', 'tests/.gitkeep', 'scripts/check.sh', 'scripts/build.py',
-                 'scripts/test.py', '.githooks/pre-commit', '.githooks/pre-push'}
+                 'scripts/test.py', '.husky/pre-commit', '.husky/pre-push'}
 
 
 def links(path):
@@ -61,6 +62,7 @@ class CatalogTests(unittest.TestCase):
             with self.subTest(leaf=name):
                 source = ROOT / name
                 actual = {p.relative_to(source).as_posix() for p in source.rglob('*') if p.is_file()}
+                expected = expected | HUSKY_FILES
                 self.assertEqual(actual, expected, 'unlisted or forbidden distribution file')
                 self.assertFalse(any(p.is_symlink() for p in source.rglob('*')))
                 dest = Path(tempfile.mkdtemp(prefix='copy-', dir=cache)) / 'project'
@@ -76,16 +78,16 @@ class CatalogTests(unittest.TestCase):
                         path = (config.parent / include).resolve()
                         self.assertTrue(path.is_relative_to(dest.resolve()))
                         self.assertTrue(path.is_file())
+                manifest = json.loads((dest / 'package.json').read_text())
+                self.assertEqual(manifest['devDependencies']['husky'], '9.1.7')
+                self.assertNotIn('prepare', manifest['scripts'])
+                self.assertNotIn('postinstall', manifest['scripts'])
+                self.assertEqual(manifest['scripts']['check'], 'sh scripts/check.sh all')
                 for hook in ['pre-commit', 'pre-push']:
-                    if name == 'roblox/rojo':
-                        mode = 'commit' if hook == 'pre-commit' else 'push'
-                        self.assertIn('exec lune run scripts/check-git.luau ' + mode,
-                                      (dest / '.githooks' / hook).read_text().splitlines())
-                        self.assertTrue((dest / 'scripts/check-git.luau').is_file())
-                        # Actual downstream all-stage execution is covered by LuauGitGateTests.
-                    else:
-                        self.assertIn('scripts/check.sh', (dest / '.githooks' / hook).read_text())
-                    self.assertTrue((dest / 'scripts/check.sh').is_file())
+                    mode = '' if hook == 'pre-commit' else ' push'
+                    self.assertIn('exec node check-commit.mjs' + mode, (dest / '.husky' / hook).read_text().splitlines())
+                if name == 'roblox/rojo':
+                    self.assertEqual(manifest['scripts']['check:git'], 'lune run scripts/check-git.luau')
 
     def test_explicit_nonempty_suites_preserve_typescript_entry(self):
         scripts = json.loads((ROOT / 'package.json').read_text())['scripts']

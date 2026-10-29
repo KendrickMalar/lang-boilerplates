@@ -32,8 +32,8 @@ Wally **0.3.2**。製品 source、`roblox.yml`、`wally.lock`、fixture/cache �
 | [scripts/check-git.luau](scripts/check-git.luau)                 | `scripts/check-git.luau`                          |
 | [scripts/git-state.luau](scripts/git-state.luau)                 | `scripts/git-state.luau`                          |
 | [scripts/test-helpers.luau](scripts/test-helpers.luau)           | `scripts/test-helpers.luau`                       |
-| [.githooks/pre-commit](.githooks/pre-commit)                     | `.githooks/pre-commit`                            |
-| [.githooks/pre-push](.githooks/pre-push)                         | `.githooks/pre-push`                              |
+| [.husky/pre-commit](.husky/pre-commit)                     | `.husky/pre-commit`                            |
+| [.husky/pre-push](.husky/pre-push)                         | `.husky/pre-push`                              |
 | [LICENSE](LICENSE)                                               | `LICENSE.lang-boilerplates`                       |
 | この README                                                      | 参照用。製品 README を上書きしない                |
 
@@ -88,7 +88,7 @@ lockはReleaseRecordのarchive/binary SHA256とsource commitを固定します�
 Lune 0.10.5に内蔵された型宣言も、専用HOME/cwdで生成して `.tools/` 内へ置きます。
 利用者のHOME・既存 `.luaurc` は変更しません。型宣言の生成はnetworkを使いません。
 verifyはローカルのhash・版・所有記録を照合するだけです。未導入・改変・版違いを許容しません。
-実CLIにはRust/Node/Python/Javaは不要です。この設定の検査は既存LuneとOS標準toolを使います。
+類似度CLI自体にはRust/Node/Python/Javaは不要です。Gitフックの管理にはNode・pnpm・Huskyが必要です。
 
 CLIの自作部分は一般向け再配布許諾がありません。このboilerplateのMITとは別です。
 CLI archive内のLICENSE・third-party noticesを維持し、MPL sourceは同じprivate Releaseの
@@ -152,30 +152,66 @@ Lune で実行するため、対象は `require("./x")` や `require("../x")` �
 限ります。`script.Parent` 形式の require や Roblox API に依存するコードは Lune では動きません。
 Roblox 上の動作は Studio で確認してください。
 
-## 手動 Git フック（別承認で有効化）
+## Husky による Git フック（必須・明示有効化）
 
-コピー/check は hooksPath を変更しません。Node/Husky は不要です。
-プロジェクト root で、まず有効な設定の全 origin と既存フックを読み取り確認します。
+Node **24.15以上の24系または26以上**（25は対象外）、pnpm **12.6.0**、Husky **9.1.7** が必要です。
+製品リポジトリの Git root に [package.json](package.json)、[pnpm-workspace.yaml](pnpm-workspace.yaml)、
+[.node-version](.node-version)、[check-commit.mjs](check-commit.mjs)、
+[.husky/pre-commit](.husky/pre-commit)・[.husky/pre-push](.husky/pre-push) を置きます。
+既存 package.json / lock / Git 設定は差分統合し、上書きしません。コピー/install/check は hooksPath を変更しません。
+
+依存導入と有効化は別手順です。対象・保存先・副作用の別承認後、Git root で実行します。
 
 ```sh
+pnpm install --ignore-scripts --engine-strict
+# 初回生成した pnpm-lock.yaml はレビューし、Git に保存する。
+# lock がある以降は --frozen-lockfile を追加する。
 git config --show-origin --get-all core.hooksPath
 git rev-parse --git-path hooks
 ```
 
-設定が未定義の場合の最初のコマンドは exit 1 です。既存フック、global hooksPath、
-symlink があれば**有効化を停止して相談**し、既存内容・差分を提示してください。
-local hooksPath は global の既存フックも隠すため、無断で置き換え/連結しません。
-既存フックなし、又は承認済みの統合方針がある場合に限り、変更の別承認後に実行します。
+設定未定義の config コマンドは exit 1 です。既存フック・global hooksPath・symlink があれば停止して相談し、
+既存フックを無断で隠したり置き換えたりしません。何もない場合だけ、承認された Git root で明示有効化します。
 
 ```sh
-chmod +x .githooks/pre-commit .githooks/pre-push
-git config --local core.hooksPath .githooks
+pnpm exec husky
+git config --local --get core.hooksPath # .husky/_
 ```
 
-pre-commit／pre-pushの両方が `lune run scripts/check-git.luau commit|push` を通り、
-format → lint → typecheck → test → build → similarityを毎回すべて実行します。
-不合格は非0でcommit/pushを止めます。IDEのGitにも同じPATHが必要です。
-GitHub への試験 push、global Git 設定変更、`--no-verify` による回避は行いません。
+既存 global dispatcher が Git共通ディレクトリの hooks を呼ぶ場合は、`pnpm exec husky` を実行せず、
+既存設定を維持した bridge を別途設計します。bridge は現在の worktree の Git root へ移動し、
+`node_modules/.bin` を PATH に加え、`sh .husky/pre-commit` / `sh .husky/pre-push "$@"` を呼びます。
+push の stdin はそのまま引き継ぎます。共有 hooks・global フック・他 worktree の影響を確認し、
+既存ファイル・symlink の上書きや main worktree への固定参照はしません。
+
+commit 前は `node check-commit.mjs`、push 前は `node check-commit.mjs push` が全体検査を実行します。
+通常は `pnpm run check` → `sh scripts/check.sh all` です。Roblox は `check:git` があれば
+`pnpm run check:git commit|push` → 既存 Luau guard → 全体検査へ渡します。
+検査失敗・tool不足・0件testを成功扱いにしません。commit は未stage・未追跡・隠すindex flag・
+検査中のstage内容変更も拒否します。自動 stash / format / stage / 復元はしません。
+pnpm は `verifyDepsBeforeRun: error` により、検査時の自動 install を拒否します。
+
+全体検査に必要な tool / lock / source / test と環境変数を IDE の Git にも用意してください。
+Simulator起動やapp配置・依存取得・ビルドなどの副作用も事前に範囲を確認します。
+正常 commit と、不正 commit（HEAD 不変）・ローカル bare remote への不正 push（remote ref 不変）を検証します。
+設定コピーや直接 check の成功だけでフック有効化済みとは扱いません。GitHub への試験 push はしません。
+ローカルフックは未導入端末や明示スキップを強制的に防げません。CI・必須チェックは別要件です。
+
+### 複数言語を同居させる場合
+
+Husky は Git root に1つだけ配置します。各 leaf の言語設定・scripts は `game/` / `art/` などへ置き、
+上記の Node / Husky 管理ファイルは root に統合します。子ディレクトリで Husky を有効化しません。
+子の `node_modules/`・ビルド生成物も Git に入らないよう ignore を統合します。
+例えば Godot と Blender の root package.json の `scripts.check` は次の値にします。
+
+```json
+"check": "sh game/scripts/check.sh all && sh art/scripts/check.sh all"
+```
+
+各 check.sh は自身の leaf に移動します。どちらかが失敗すれば両フックとも非0になります。
+Tauri + TypeScript では root の `check` に backend と frontend の全体検査を漏れなく登録します。
+frontend側 package.json の check 名と root の集約 check 名を分け、相互呼び出しの再帰を避けます。
+Roblox の Git root / project root の不一致は既存 guard の対象外なので、guard を外して混在対応しません。
 
 ### Git guardの範囲
 
@@ -192,7 +228,7 @@ HEAD、branch、tag、完全SHAを使うpushでも、対象commitがHEADと違�
 前後照合は全瞬間の監視や悪意ある同一ユーザーによる全競合の防御を保証するものではありません。
 
 global dispatcherがある場合も、そのままhooksPathを上書きしないでください。
-common Git directoryの既存hookから、現在のworktreeの `.githooks/` へ渡す承認済みbridgeを
+common Git directoryの既存hookから、現在のworktreeの `.husky/` へ渡す承認済みbridgeを
 用いる方式を隔離fixtureで確認しています。実環境の連結は既存内容を読み、別途承認を得ます。
 
 ## 検証範囲

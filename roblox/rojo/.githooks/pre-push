@@ -1,8 +1,0 @@
-#!/bin/sh
-# Manual opt-in only. Preserve stdin for push ref validation.
-set -eu
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-git_root=$(git rev-parse --show-toplevel)
-[ "$root" = "$git_root" ] || { printf '%s\n' 'error: hook and Git project root differ' >&2; exit 1; }
-cd "$root"
-exec lune run scripts/check-git.luau push

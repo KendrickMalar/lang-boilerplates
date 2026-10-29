@@ -10,14 +10,16 @@
   },
   "scripts": {
     "test:static": "node --test tests/common.test.mjs tests/readme.test.mjs tests/node-support.test.mjs tests/game3d.test.mjs",
-    "test:integration": "node --test --test-concurrency=1 tests/node.test.mjs tests/web.test.mjs tests/library.test.mjs tests/hooks.test.mjs tests/commit-gate.test.mjs tests/global-hooks.test.mjs tests/quality-metrics.test.mjs tests/similarity.test.mjs tests/strict-lint.test.mjs tests/game3d-integration.test.mjs",
+    "test:integration": "node --test --test-concurrency=1 tests/node.test.mjs tests/web.test.mjs tests/library.test.mjs tests/hooks.test.mjs tests/commit-gate.test.mjs tests/global-hooks.test.mjs tests/quality-metrics.test.mjs tests/similarity.test.mjs tests/strict-lint.test.mjs tests/game3d-integration.test.mjs tests/all-language-husky.test.mjs",
     "test": "node --version && pnpm test:static && pnpm test:integration",
     "test:native:quality": "python3 -m tests.native.test_catalog tests.native.test_quality_settings",
     "test:native:static": "python3 -m tests.native.test_catalog tests.native.test_catalog tests.native.test_static_rust tests.native.test_static_swift tests.native.test_static_roblox tests.native.test_static_godot tests.native.test_static_blender tests.native.test_hooks.HookContractTests",
     "test:native:rust": "python3 -m tests.native.test_catalog tests.native.test_rust tests.native.test_hooks.RustHookTests",
     "test:native:macos": "PYTHONPATH=tests/native python3 -m tests.native.test_catalog tests.native.test_swift_macos tests.native.test_hooks.MacOSHookTests",
     "test:native:roblox": "python3 -m tests.native.test_catalog tests.native.test_catalog tests.native.test_static_roblox tests.native.test_roblox tests.native.test_luau_similarity tests.native.test_hooks.RobloxHookTests tests.native.test_hooks.HookContractTests",
-    "test:native:ios": "PYTHONPATH=tests/native python3 -m tests.native.test_catalog tests.native.test_swift_ios tests.native.test_hooks.IOSHookTests"
+    "test:native:ios": "PYTHONPATH=tests/native python3 -m tests.native.test_catalog tests.native.test_swift_ios tests.native.test_hooks.IOSHookTests",
+    "test:husky": "node --test tests/all-language-husky.test.mjs",
+    "test:husky:luau": "python3 -m tests.native.test_catalog tests.native.test_husky_git_state"
   },
   "devDependencies": {
     "typescript": "6.0.3",

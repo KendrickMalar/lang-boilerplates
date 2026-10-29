@@ -3,3 +3,7 @@ __pycache__/
 *.blend1
 /.verification/
 .DS_Store
+
+# Husky tooling (lockfile remains tracked)
+/node_modules/
+/.husky/_/

@@ -18,8 +18,8 @@ Blender **5.2.2 LTS**（同梱 Python 3.13）、ruff **0.17.0**、glTF-Transform
 | [scripts/check.sh](scripts/check.sh) | `scripts/check.sh` |
 | [scripts/build.py](scripts/build.py) | `scripts/build.py` |
 | [scripts/test.py](scripts/test.py) | `scripts/test.py` |
-| [.githooks/pre-commit](.githooks/pre-commit) | `.githooks/pre-commit` |
-| [.githooks/pre-push](.githooks/pre-push) | `.githooks/pre-push` |
+| [.husky/pre-commit](.husky/pre-commit) | `.husky/pre-commit` |
+| [.husky/pre-push](.husky/pre-push) | `.husky/pre-push` |
 | [LICENSE](LICENSE) | `LICENSE.lang-boilerplates` |
 | この README | 参照用。製品 README を上書きしない |
 
@@ -87,18 +87,67 @@ Blender 5.2.2 は `--python` のスクリプトが例外で止まっても終了
 `tests/test_*.py` は unittest で書きます。Blender 内で動くので `bpy` を使えます。
 `models/` は `from models import cube` のように import できます。
 
-## 手動 Git フック（別承認で有効化）
+## Husky による Git フック（必須・明示有効化）
 
-godot/mobile の README と同じ手順です。フックは自身の位置から leaf の root を求めます。
+Node **24.15以上の24系または26以上**（25は対象外）、pnpm **12.6.0**、Husky **9.1.7** が必要です。
+製品リポジトリの Git root に [package.json](package.json)、[pnpm-workspace.yaml](pnpm-workspace.yaml)、
+[.node-version](.node-version)、[check-commit.mjs](check-commit.mjs)、
+[.husky/pre-commit](.husky/pre-commit)・[.husky/pre-push](.husky/pre-push) を置きます。
+既存 package.json / lock / Git 設定は差分統合し、上書きしません。コピー/install/check は hooksPath を変更しません。
+
+依存導入と有効化は別手順です。対象・保存先・副作用の別承認後、Git root で実行します。
 
 ```sh
+pnpm install --ignore-scripts --engine-strict
+# 初回生成した pnpm-lock.yaml はレビューし、Git に保存する。
+# lock がある以降は --frozen-lockfile を追加する。
 git config --show-origin --get-all core.hooksPath
 git rev-parse --git-path hooks
-chmod +x art/.githooks/pre-commit art/.githooks/pre-push art/scripts/check.sh
-git config --local core.hooksPath art/.githooks
 ```
 
-既存フック、global hooksPath、symlink があれば停止して相談してください。
+設定未定義の config コマンドは exit 1 です。既存フック・global hooksPath・symlink があれば停止して相談し、
+既存フックを無断で隠したり置き換えたりしません。何もない場合だけ、承認された Git root で明示有効化します。
+
+```sh
+pnpm exec husky
+git config --local --get core.hooksPath # .husky/_
+```
+
+既存 global dispatcher が Git共通ディレクトリの hooks を呼ぶ場合は、`pnpm exec husky` を実行せず、
+既存設定を維持した bridge を別途設計します。bridge は現在の worktree の Git root へ移動し、
+`node_modules/.bin` を PATH に加え、`sh .husky/pre-commit` / `sh .husky/pre-push "$@"` を呼びます。
+push の stdin はそのまま引き継ぎます。共有 hooks・global フック・他 worktree の影響を確認し、
+既存ファイル・symlink の上書きや main worktree への固定参照はしません。
+
+commit 前は `node check-commit.mjs`、push 前は `node check-commit.mjs push` が全体検査を実行します。
+通常は `pnpm run check` → `sh scripts/check.sh all` です。Roblox は `check:git` があれば
+`pnpm run check:git commit|push` → 既存 Luau guard → 全体検査へ渡します。
+検査失敗・tool不足・0件testを成功扱いにしません。commit は未stage・未追跡・隠すindex flag・
+検査中のstage内容変更も拒否します。自動 stash / format / stage / 復元はしません。
+pnpm は `verifyDepsBeforeRun: error` により、検査時の自動 install を拒否します。
+
+全体検査に必要な tool / lock / source / test と環境変数を IDE の Git にも用意してください。
+Simulator起動やapp配置・依存取得・ビルドなどの副作用も事前に範囲を確認します。
+正常 commit と、不正 commit（HEAD 不変）・ローカル bare remote への不正 push（remote ref 不変）を検証します。
+設定コピーや直接 check の成功だけでフック有効化済みとは扱いません。GitHub への試験 push はしません。
+ローカルフックは未導入端末や明示スキップを強制的に防げません。CI・必須チェックは別要件です。
+
+### 複数言語を同居させる場合
+
+Husky は Git root に1つだけ配置します。各 leaf の言語設定・scripts は `game/` / `art/` などへ置き、
+上記の Node / Husky 管理ファイルは root に統合します。子ディレクトリで Husky を有効化しません。
+子の `node_modules/`・ビルド生成物も Git に入らないよう ignore を統合します。
+例えば Godot と Blender の root package.json の `scripts.check` は次の値にします。
+
+```json
+"check": "sh game/scripts/check.sh all && sh art/scripts/check.sh all"
+```
+
+各 check.sh は自身の leaf に移動します。どちらかが失敗すれば両フックとも非0になります。
+Tauri + TypeScript では root の `check` に backend と frontend の全体検査を漏れなく登録します。
+frontend側 package.json の check 名と root の集約 check 名を分け、相互呼び出しの再帰を避けます。
+Roblox の Git root / project root の不一致は既存 guard の対象外なので、guard を外して混在対応しません。
+
 
 ## 検証範囲
 

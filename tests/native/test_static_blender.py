@@ -49,12 +49,11 @@ class StaticBlenderTests(unittest.TestCase):
             self.assertEqual([p.name for p in (LEAF / empty).iterdir()], [".gitkeep"])
         self.assertEqual(list(LEAF.rglob("*.glb")), [])
 
-    def test_hooks_are_leaf_relative(self):
+    def test_hooks_use_repository_root_gate(self):
         for hook in ["pre-commit", "pre-push"]:
-            text = (LEAF / ".githooks" / hook).read_text()
-            self.assertIn('dirname -- "$0"', text)
-            self.assertNotIn("--show-toplevel", text)
-            self.assertIn("scripts/check.sh", text)
+            text = (LEAF / ".husky" / hook).read_text()
+            self.assertIn("node check-commit.mjs", text)
+        self.assertIn("scripts/check.sh all", (LEAF / "package.json").read_text())
 
     def test_readme_links_resolve(self):
         text = (LEAF / "README.md").read_text()

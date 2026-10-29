@@ -1,1 +1,1 @@
-pnpm check
+pnpm_config_verify_deps_before_run=error pnpm check

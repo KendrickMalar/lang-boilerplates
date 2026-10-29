@@ -41,21 +41,35 @@ def copy_check_script(leaf, root):
         'script_sha256': hashlib.sha256(data).hexdigest()}, indent=2))
 
 
+def install_husky_dependencies(root, env):
+    """Explicit fixture setup only; hooks never install dependencies."""
+    pnpm = shutil.which('pnpm')
+    node = shutil.which('node')
+    if pnpm is None or node is None:
+        raise RuntimeError('Node and pnpm 12.6.0 required')
+    env['PATH'] = os.pathsep.join([str(Path(node).parent), str(Path(pnpm).parent), env['PATH']])
+    result = subprocess.run([pnpm, 'install', '--ignore-scripts', '--engine-strict',
+                             '--store-dir', str(ROOT / '.verification/pnpm-store')],
+                            cwd=root, env=env, text=True, capture_output=True)
+    if result.returncode:
+        raise RuntimeError(result.stdout + result.stderr)
+    return node
+
 class HookContractTests(unittest.TestCase):
     def test_hooks_executable_and_empty_project_fails_without_install(self):
         CACHE.mkdir(parents=True, exist_ok=True)
         for leaf in ['rust/tauri', 'swift/macos', 'swift/ios', 'roblox/rojo']:
             for hook in ['pre-commit', 'pre-push']:
                 with self.subTest(leaf=leaf, hook=hook):
-                    source = ROOT / leaf / '.githooks' / hook
+                    source = ROOT / leaf / '.husky' / hook
                     self.assertTrue(source.is_file(), 'manual hook missing')
-                    self.assertTrue(os.access(source, os.X_OK), 'hook must be executable')
+                    self.assertTrue(source.read_text().strip(), 'hook must not be empty')
                     project = Path(tempfile.mkdtemp(prefix='empty-', dir=CACHE))
                     shutil.copytree(ROOT / leaf, project, dirs_exist_ok=True)
                     env = os.environ.copy()
                     env.update(HOME=str(project), GIT_CONFIG_GLOBAL='/dev/null', GIT_CONFIG_NOSYSTEM='1')
                     subprocess.run(['git', 'init', '-q', str(project)], env=env, check=True)
-                    result = subprocess.run([str(project / '.githooks' / hook)], cwd=project,
+                    result = subprocess.run(['sh', str(project / '.husky' / hook)], cwd=project,
                                             env=env, text=True, capture_output=True)
                     self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
 
@@ -64,7 +78,7 @@ class HookContractTests(unittest.TestCase):
             text = (ROOT / leaf / 'README.md').read_text()
             for command in ['git config --show-origin --get-all core.hooksPath',
                             'git rev-parse --git-path hooks',
-                            'git config --local core.hooksPath .githooks']:
+                            'pnpm exec husky']:
                 self.assertIn(command, text)
             self.assertIn('既存フック', text)
             self.assertIn('別承認', text)
@@ -122,14 +136,23 @@ def exercise_git_gates(test: unittest.TestCase, platform: str, inputs):
     original_source, original_test = source.read_bytes(), test_source.read_bytes()
     try:
         run(['init', '-q'])
-        if platform == 'roblox':
-            run(['add', '.'])  # Full gate requires the complete configuration and source index.
-        else:
-            run(['add', '--', str(source.relative_to(root)), str(test_source.relative_to(root))])
+        # Dependencies are installed explicitly, before any hook can run. No compiler/tool install.
+        node = install_husky_dependencies(root, env)
+        # Fixture-owned transient files, not product source, stay out of the index.
+        with (sandbox / 'git/info/exclude').open('a') as exclude:
+            exclude.write('\n/home/\n/dependency-evidence.json\n')
+        run(['add', '.'])
         # Existing inherited hook is not overwritten; opt-in requires separate permission.
         run(['commit', '-qm', 'existing hook refuses activation'], success=False)
         test.assertEqual(existing.read_text(), '#!/bin/sh\nexit 23\n')
-        run(['config', '--local', 'core.hooksPath', str(root / '.githooks')])
+        # Husky supports linked/external Git directories; run its installer in a fixture-owned
+        # cwd with a .git marker, writing hooks into this fixture rather than the real repo.
+        (sandbox / '.git').mkdir()
+        installer = ROOT / 'node_modules/husky/bin.js'
+        activated = subprocess.run([node, str(installer), str(root / '.husky')],
+                                   cwd=sandbox, env=env, text=True, capture_output=True)
+        test.assertEqual(activated.returncode, 0, activated.stdout + activated.stderr)
+        test.assertEqual(run(['config', '--local', '--get', 'core.hooksPath']), str(root / '.husky/_'))
         run(['commit', '-qm', 'normal native fixture'])
         head = run(['rev-parse', 'HEAD'])
         remote = sandbox / 'remote.git'
@@ -161,33 +184,20 @@ def exercise_git_gates(test: unittest.TestCase, platform: str, inputs):
         test.assertEqual(run(['rev-parse', 'HEAD']), head)
         source.write_bytes(original_source)
         run(['add', '--', str(source.relative_to(root))])
-        # Formatter-only commit accepts a formatted failing test; full push rejects it.
+        # A formatted failing test must be rejected at commit for every native language.
         test_source.write_text(bad_test)
         run(['add', '--', str(test_source.relative_to(root))])
-        if platform == 'roblox':
-            run(['commit', '-qm', 'formatted failing test'], success=False)
-            test.assertIn('FAIL tests/Greeting.spec.luau', receipts[-1]['stdout'] + receipts[-1]['stderr'])
-            test.assertEqual(run(['rev-parse', 'HEAD']), head)
-            run(['push', str(remote), 'HEAD:refs/heads/rejected'], success=False)
-            test.assertEqual(remote_head(), head)
-            test_source.write_bytes(original_test)
-            run(['add', '--', str(test_source.relative_to(root))])
-            return  # No bad commit exists; unlike formatter-only platforms there is nothing to restore.
-        run(['commit', '-qm', 'formatted failing test'])
-        bad_head = run(['rev-parse', 'HEAD'])
-        test.assertNotEqual(bad_head, head)
-        run(['push', str(remote), 'HEAD:refs/heads/fixture'], success=False)
+        run(['commit', '-qm', 'formatted failing test'], success=False)
         output = receipts[-1]['stdout'] + receipts[-1]['stderr']
         test.assertIn({'rust': 'test result: FAILED', 'roblox': 'FAIL tests/Greeting.spec.luau'}
                       .get(platform, 'FixtureTests.testAddition()'), output)
-        test.assertNotIn('stage: build', output)
-        test.assertEqual(run(['rev-parse', 'HEAD']), bad_head)
+        test.assertEqual(run(['rev-parse', 'HEAD']), head)
+        run(['push', str(remote), 'HEAD:refs/heads/rejected'], success=False)
+        test.assertEqual(run(['ls-remote', str(remote), 'refs/heads/rejected']), '')
         test.assertEqual(remote_head(), head)
         test_source.write_bytes(original_test)
         run(['add', '--', str(test_source.relative_to(root))])
-        run(['commit', '-qm', 'restore normal test'])
-        run(['push', str(remote), 'HEAD:refs/heads/fixture'])
-        test.assertEqual(remote_head(), run(['rev-parse', 'HEAD']))
+
     finally:
         source.write_bytes(original_source)
         test_source.write_bytes(original_test)
@@ -201,7 +211,7 @@ class RustHookTests(unittest.TestCase):
 
     def test_real_commit_push_gates_and_global_preservation(self):
         leaf = ROOT / ("rust/tauri" if self.platform == "rust" else "swift/" + self.platform)
-        self.assertTrue((leaf / ".githooks/pre-commit").is_file(), "manual hook missing")
+        self.assertTrue((leaf / ".husky/pre-commit").is_file(), "manual hook missing")
         exercise_git_gates(self, self.platform, self.fixture_inputs())
 
     def fixture_inputs(self):
@@ -231,7 +241,9 @@ class RustHookTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         validate_rust_dependencies(json.loads(result.stdout), root / 'src-tauri/Cargo.lock',
                                    RUST_CACHE / 'approved-resolution')
-        shutil.copytree(ROOT / 'rust/tauri/.githooks', root / '.githooks', dirs_exist_ok=True)
+        shutil.copytree(ROOT / 'rust/tauri/.husky', root / '.husky', dirs_exist_ok=True)
+        for name in ['package.json', 'pnpm-workspace.yaml', '.node-version', 'check-commit.mjs', '.gitignore']:
+            shutil.copyfile(ROOT / 'rust/tauri' / name, root / name)
         return (root, rust_env(root), source, tests, 'fn main(){println!("bad");}\n',
                 LIB_SOURCE.replace('super::add(2, 3), 5', 'super::add(2, 3), 6'))
 
@@ -241,7 +253,7 @@ class MacOSHookTests(unittest.TestCase):
 
     def test_real_commit_push_gates_and_global_preservation(self):
         leaf = ROOT / ("rust/tauri" if self.platform == "rust" else "swift/" + self.platform)
-        self.assertTrue((leaf / ".githooks/pre-commit").is_file(), "manual hook missing")
+        self.assertTrue((leaf / ".husky/pre-commit").is_file(), "manual hook missing")
         exercise_git_gates(self, self.platform, self.fixture_inputs())
 
     def fixture_inputs(self):
@@ -267,7 +279,7 @@ class RobloxHookTests(unittest.TestCase):
     platform = 'roblox'
 
     def test_real_commit_push_gates_and_global_preservation(self):
-        self.assertTrue((ROOT / 'roblox/rojo/.githooks/pre-commit').is_file(), 'manual hook missing')
+        self.assertTrue((ROOT / 'roblox/rojo/.husky/pre-commit').is_file(), 'manual hook missing')
         exercise_git_gates(self, self.platform, self.fixture_inputs())
 
     def fixture_inputs(self):
