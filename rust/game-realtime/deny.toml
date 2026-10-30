@@ -1,0 +1,38 @@
+# cargo-deny 0.20.2. Deployment targets are not fixed here; add `[graph] targets` for yours.
+[graph]
+all-features = true
+
+[advisories]
+unmaintained = "all"
+unsound = "all"
+yanked = "deny"
+
+[licenses]
+allow = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-3.0", "Zlib"]
+confidence-threshold = 0.93
+# The list is a fixed policy, not a record of what the current graph uses.
+unused-allowed-license = "allow"
+
+# The consumer's own unpublished (`publish = false`) crates are not license-checked.
+[licenses.private]
+ignore = true
+
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"
+# Path dependencies between the workspace's own `publish = false` crates have no version.
+allow-wildcard-paths = true
+deny = [
+    { crate = "bincode", reason = "RUSTSEC-2025-0141 (unmaintained)" },
+    { crate = "fred", reason = "no release since 2025-02; use redis" },
+    { crate = "poem", reason = "no release since 2025-07; use axum" },
+    { crate = "openssl", reason = "TLS is limited to rustls" },
+    { crate = "openssl-sys", reason = "TLS is limited to rustls" },
+    { crate = "laminar", reason = "no release since 2021; use quinn or renet2" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

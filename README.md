@@ -58,6 +58,7 @@ suite を自動導入/自動実行しません。tool や依存は対象・保�
 pnpm test:native:static
 pnpm test:native:quality # 設定の実効検証。既存Clippy/SwiftLint/swift-format/luau-lspのみ使用
 pnpm test:native:rust
+pnpm test:native:rust-game # game-realtime / game-room / game-social。隔離した Rust 1.99.1 と各 tool を使用
 pnpm test:native:macos
 pnpm test:native:roblox
 NATIVE_IOS_TEST_DESTINATION='platform=iOS Simulator,id=APPROVED-UUID' pnpm test:native:ios
@@ -85,7 +86,7 @@ iOS27.0 iPhone17/iPad(A16) Simulator app test/build です。Package-only/mock �
 ## 範囲
 
 - TypeScript: Node/CLI、汎用Web、ブラウザ3Dゲーム（Three.js＋Rapier）、npmライブラリ。
-- Rust: Tauri desktop の backend のみ（Rust1.92.0/edition2024/Tauri2.12.2/tauri-build2.7.1）。frontend は利用側で接続。
+- Rust: Tauri desktop の backend（Rust1.92.0/edition2024/Tauri2.12.2/tauri-build2.7.1）。frontend は利用側で接続。ゲームサーバー用に game-realtime（サーバー権威の対戦）/ game-room（ルーム制・WebSocket）/ game-social（ソシャゲ型 HTTP API）の品質設定（Rust1.99.1/edition2024、依存・source なし）。
 - Swift: 標準 Xcode app 用、Swift6 mode/macOS15/iOS17/SwiftLint0.65.1。xcconfig の実効接続を確認。
 - Roblox: Rojo でファイル管理するゲーム用（Rojo7.7.1/StyLua2.5.2/Selene0.32.0/luau-lsp1.69.0/Lune0.10.5/Wally0.3.2 を Rokit で固定）。macOS 実検証、Studio 実同期は未検証。
 - Godot: モバイルゲーム用（Godot4.7.2/gdtoolkit4.5.0）。型付き GDScript を強制し、ヘッドレスで検査とテスト。asuka で手動確認、実ツール suite なし。
