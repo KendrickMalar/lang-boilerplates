@@ -226,11 +226,13 @@ commit は未 stage・未追跡・index を隠す flag・検査中の stage 内�
 
 ## 検証範囲
 
-macOS（aarch64）で、隔離した RUSTUP_HOME・CARGO_HOME と最小の fixture crate を使い、
-正常系（commit・push の全段、依存なしで `.sqlx/` 不要）と異常系（unwrap、print、unsafe、missing docs、pedantic、`std::thread::sleep`、format、
-`[lints] workspace = true` 欠落、未使用依存、テスト0件、Cargo.lock なし、tool 不足・版違い・版の読み取り失敗、
-行カバレッジ90%未満、advisory DB の取得失敗とオフライン、social 専用の規則（`.await` をまたぐ lock、生 SQL・timeout なし client の禁止 API、`native-tls` の ban、`SQLX_OFFLINE=true`））を実ツールで確かめています。
-advisories の正常系だけは実際に RustSec の DB を取得しました。
+macOS（aarch64）で、隔離した RUSTUP_HOME・CARGO_HOME と最小の fixture crate を使い、実ツールで次を確かめています。
+
+- 正常系: 依存なしの clean な workspace で `commit` の全段が通ること、`push` の全段（format・lint・deps・test・coverage・advisories・build）がこの順で通ること（advisories は実際に RustSec の DB を取得しました）。
+- 異常系: `.await` をまたいで `std::sync::Mutex` の guard を持つ関数が `await_holding_lock` で落ち、await の前に guard を手放すと通ること。`sqlx::query`・`sqlx::query_as`・`reqwest::Client::new` の呼び出しが`disallowed_methods` で落ちること（path 依存の偽 crate を使用）。`bincode`・`native-tls` の偽 crate が `deps` 段で ban されること。sqlx なし（`.sqlx/` なし）で `commit` が通ること、`check.sh` が `env: SQLX_OFFLINE=true` を表示し、呼び出し側の指定を尊重すること。
+- 設定してあるが、この leaf では実ツールで確かめていない規則: `await_holding_refcell_ref`。
+- 共通の段（unwrap・print・unsafe・missing docs・pedantic・`std::thread::sleep`・format・`[lints] workspace = true` 欠落・未使用依存・テスト0件・Cargo.lock なし・tool 不足・版違い・版の読み取り失敗・行カバレッジ90%未満・advisory DB の取得失敗とオフライン）の異常系は、同じ `scripts/check.sh` と共通設定を持つ game-realtime の leaf で実ツールの確認をしています。この leaf では繰り返していません。
+
 fixture は配布しません。**Linux・Windows での実行、CI、本物のサーバー依存（tokio など）での build は未実施**です。
 
 本設定はこのリポジトリの MIT ライセンスです。依存のライセンスは製品の解決結果に対して別に確かめてください。

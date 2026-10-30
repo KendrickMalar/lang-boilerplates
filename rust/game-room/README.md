@@ -217,11 +217,13 @@ commit は未 stage・未追跡・index を隠す flag・検査中の stage 内�
 
 ## 検証範囲
 
-macOS（aarch64）で、隔離した RUSTUP_HOME・CARGO_HOME と最小の fixture crate を使い、
-正常系（commit・push の全段）と異常系（unwrap、print、unsafe、missing docs、pedantic、`std::thread::sleep`、format、
-`[lints] workspace = true` 欠落、未使用依存、テスト0件、Cargo.lock なし、tool 不足・版違い・版の読み取り失敗、
-行カバレッジ90%未満、advisory DB の取得失敗とオフライン、room 専用の規則（`.await` をまたぐ lock、巨大な future 相当の lint、背圧のない channel の禁止 API、`actix` の ban））を実ツールで確かめています。
-advisories の正常系だけは実際に RustSec の DB を取得しました。
+macOS（aarch64）で、隔離した RUSTUP_HOME・CARGO_HOME と最小の fixture crate を使い、実ツールで次を確かめています。
+
+- 正常系: 依存なしの clean な workspace で `commit` の全段が通ること、`push` の全段（format・lint・deps・test・coverage・advisories・build）がこの順で通ること（advisories は実際に RustSec の DB を取得しました）。
+- 異常系: `.await` をまたいで `std::sync::Mutex` の guard を持つ関数が `await_holding_lock` で落ち、await の前に guard を手放すと通ること。`tokio::sync::mpsc::unbounded_channel`・`futures::channel::mpsc::unbounded` の呼び出しが`disallowed_methods` で落ちること（依存の代わりに path 依存の偽 crate を使用）。`bincode`・`actix` の偽 crate が `deps` 段で ban されること。
+- 設定してあるが、この leaf では実ツールで確かめていない規則: `await_holding_refcell_ref`、`await_holding_invalid_type`、`large_futures`。
+- 共通の段（unwrap・print・unsafe・missing docs・pedantic・`std::thread::sleep`・format・`[lints] workspace = true` 欠落・未使用依存・テスト0件・Cargo.lock なし・tool 不足・版違い・版の読み取り失敗・行カバレッジ90%未満・advisory DB の取得失敗とオフライン）の異常系は、同じ `scripts/check.sh` と共通設定を持つ game-realtime の leaf で実ツールの確認をしています。この leaf では繰り返していません。
+
 fixture は配布しません。**Linux・Windows での実行、CI、本物のサーバー依存（tokio など）での build は未実施**です。
 
 本設定はこのリポジトリの MIT ライセンスです。依存のライセンスは製品の解決結果に対して別に確かめてください。

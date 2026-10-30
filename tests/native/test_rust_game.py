@@ -472,7 +472,7 @@ impl Client {
     }
 }
 """
-BINCODE = "pub fn encode() {}\n"
+BANNED_LIB = "pub fn encode() {}\n"
 
 
 class FakeDependencyLeaf(RealtimeLeaf):
@@ -486,7 +486,45 @@ class FakeDependencyLeaf(RealtimeLeaf):
         return self.commit(self.project(with_items(items), root=root, deps=dep))
 
 
-class RoomRuleTests(FakeDependencyLeaf):
+class AsyncLockRules:
+    """await_holding_lock and the push gate, shared by the room and social leaves."""
+
+    def lint(self, items: str) -> subprocess.CompletedProcess[str]:
+        return self.commit(self.project(with_items(items)))
+
+    def test_guard_held_across_await_rejected(self):
+        self.assert_rejected(self.lint('''
+/// Holds a guard across an await.
+pub async fn held(lock: &std::sync::Mutex<u32>) {
+    let guard = lock
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    std::future::ready(()).await;
+    drop(guard);
+}
+'''), "#await_holding_lock")
+
+    def test_guard_dropped_before_await_passes(self):
+        result = self.lint('''
+/// Reads the value, then awaits without holding the guard.
+pub async fn released(lock: &std::sync::Mutex<u32>) -> u32 {
+    let value = lock.lock().map_or(0, |guard| *guard);
+    std::future::ready(()).await;
+    value
+}
+''')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_clean_push_passes(self):
+        # Network: cargo-deny fetches the RustSec DB into the isolated CARGO_HOME.
+        result = run_game(["sh", "scripts/check.sh", "push"], self.project(), online=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        positions = [result.stdout.find(f"stage: {name}") for name in PUSH_STAGES]
+        self.assertNotIn(-1, positions, result.stdout)
+        self.assertEqual(positions, sorted(positions))
+
+
+class RoomRuleTests(AsyncLockRules, FakeDependencyLeaf):
     leaf = "game-room"
 
     def test_unbounded_channel_rejected(self):
@@ -506,7 +544,7 @@ pub fn queue() {
 '''), "#disallowed_methods")
 
 
-class SocialRuleTests(FakeDependencyLeaf):
+class SocialRuleTests(AsyncLockRules, FakeDependencyLeaf):
     leaf = "game-social"
 
     def test_raw_sqlx_query_rejected(self):
@@ -562,26 +600,34 @@ class RoomAndSocialTests(unittest.TestCase):
                 for stage in ("format", "lint", "deps", "test"):
                     self.assertIn(f"stage: {stage}", result.stdout)
 
+    def assert_banned(self, leaf: str, crate: str):
+        root = copy_leaf(leaf, "dep")
+        dep = write_fake_crate(root, crate, BANNED_LIB)
+        write_crate(root, "core", with_items(f'''
+/// Calls the stand-in.
+pub fn call() {{
+    {crate.replace("-", "_")}::encode();
+}}
+'''), deps=dep)
+        manifest = root / "Cargo.toml"
+        manifest.write_text(manifest.read_text().replace(
+            'members = ["crates/*"]\n', 'members = ["crates/*"]\nexclude = ["vendor"]\n'))
+        locked = run_game(["cargo", "generate-lockfile", "--offline"], root)
+        self.assertEqual(locked.returncode, 0, locked.stderr)
+        result = run_game(["sh", "scripts/check.sh", "deps"], root)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(f"error[banned]: crate '{crate} = 0.1.0' is explicitly banned", result.stderr)
+
     def test_banned_crate_rejected(self):
         # bincode is banned in every leaf; the stand-in crate is named after it.
         for leaf in LEAVES:
             with self.subTest(leaf=leaf):
-                root = copy_leaf(leaf, "dep")
-                dep = write_fake_crate(root, "bincode", BINCODE)
-                write_crate(root, "core", with_items('''
-/// Encodes.
-pub fn encode() {
-    bincode::encode();
-}
-'''), deps=dep)
-                manifest = root / "Cargo.toml"
-                manifest.write_text(manifest.read_text().replace(
-                    'members = ["crates/*"]\n', 'members = ["crates/*"]\nexclude = ["vendor"]\n'))
-                locked = run_game(["cargo", "generate-lockfile", "--offline"], root)
-                self.assertEqual(locked.returncode, 0, locked.stderr)
-                result = run_game(["sh", "scripts/check.sh", "deps"], root)
-                self.assertNotEqual(result.returncode, 0, result.stdout)
-                self.assertIn("error[banned]: crate 'bincode = 0.1.0' is explicitly banned", result.stderr)
+                self.assert_banned(leaf, "bincode")
+
+    def test_leaf_specific_ban_rejected(self):
+        for leaf, crate in (("game-room", "actix"), ("game-social", "native-tls")):
+            with self.subTest(leaf=leaf, crate=crate):
+                self.assert_banned(leaf, crate)
 
 
 if __name__ == "__main__":

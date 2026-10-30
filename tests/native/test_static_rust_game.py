@@ -164,6 +164,10 @@ class StaticRustGameTests(unittest.TestCase):
         for text in ["tick", "RandomState", "laminar", "fat"]:
             self.assertNotIn(text, readme, f"realtime-only README text: {text}")
 
+    @staticmethod
+    def banned(leaf: Path) -> set[str]:
+        return {entry["crate"] for entry in toml(leaf, "deny.toml")["bans"]["deny"]}
+
     def test_room_rules(self):
         self.check_async_leaf(
             ROOM,
@@ -172,11 +176,13 @@ class StaticRustGameTests(unittest.TestCase):
             {"tokio::sync::mpsc::unbounded_channel", "futures::channel::mpsc::unbounded"},
             "actix")
         self.assertNotIn("SQLX_OFFLINE", (ROOM / "scripts/check.sh").read_text())
+        self.assertNotIn("native-tls", self.banned(ROOM))
 
     def test_social_rules(self):
         self.check_async_leaf(
             SOCIAL, ["await_holding_lock", "await_holding_refcell_ref"],
             {"sqlx::query", "sqlx::query_as", "reqwest::Client::new"}, "native-tls")
+        self.assertNotIn("actix", self.banned(SOCIAL))
         clippy = toml(SOCIAL, "Cargo.toml")["workspace"]["lints"]["clippy"]
         self.assertNotIn("await_holding_invalid_type", clippy)
         self.assertNotIn("large_futures", clippy)
