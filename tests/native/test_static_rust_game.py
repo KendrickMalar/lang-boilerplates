@@ -181,7 +181,7 @@ class StaticRustGameTests(unittest.TestCase):
     def test_social_rules(self):
         self.check_async_leaf(
             SOCIAL, ["await_holding_lock", "await_holding_refcell_ref"],
-            {"sqlx::query", "sqlx::query_as", "reqwest::Client::new"}, "native-tls")
+            {"sqlx::query", "sqlx::query_as", "reqwest::Client::new", "reqwest::get"}, "native-tls")
         self.assertNotIn("actix", self.banned(SOCIAL))
         clippy = toml(SOCIAL, "Cargo.toml")["workspace"]["lints"]["clippy"]
         self.assertNotIn("await_holding_invalid_type", clippy)

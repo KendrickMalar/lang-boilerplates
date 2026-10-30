@@ -110,6 +110,8 @@ advisories 段だけがネットワークを使います。RustSec の advisory 
 `advisory database could not be fetched (network required)` を出して非0で止まります。
 push 前にネットワークにつなぐか、`sh scripts/check.sh commit` までに留めてください。
 
+`NEXTEST_PROFILE=ci sh scripts/check.sh push` のように環境変数 `NEXTEST_PROFILE=ci` を付けると、nextest は `.config/nextest.toml` の `ci` profile（`fail-fast = false`）を使います。
+
 caller の `RUSTUP_HOME`、`CARGO_HOME`、`CARGO_TARGET_DIR` を尊重します。
 環境変数はコマンド単位で指定し、global の Rustup・Git・shell の設定を変えません。
 
@@ -172,6 +174,7 @@ crate を公開する（`publish` を外す）ときは、`description`・`licen
 
 - ライセンスは MIT、Apache-2.0、BSD-2-Clause、BSD-3-Clause、ISC、Unicode-3.0、Zlib だけを許可します。ほかは利用側で追加します。
   自分の `publish = false` の crate はライセンス検査の対象外です（`[licenses.private] ignore = true`）。
+  rustls を使う構成（reqwest の `rustls`、sqlx の rustls 系 feature など）を入れる場合は、`CDLA-Permissive-2.0`（webpki-roots）などを `[licenses] allow` に足す必要が出ることがあります。`cargo deny check licenses` の出力で確かめてください。
 - ban: `bincode`（RUSTSEC-2025-0141）、`fred`、`poem`、`openssl`、`openssl-sys`、`actix`（2024 で停止。room 専用）。crates.io 以外の registry と git 依存は拒否します。
 - `[graph] targets` は書いていません。デプロイ先に合わせて、例えば `targets = ["x86_64-unknown-linux-gnu"]` を足します。
 
@@ -222,7 +225,7 @@ macOS（aarch64）で、隔離した RUSTUP_HOME・CARGO_HOME と最小の fixtu
 - 正常系: 依存なしの clean な workspace で `commit` の全段が通ること、`push` の全段（format・lint・deps・test・coverage・advisories・build）がこの順で通ること（advisories は実際に RustSec の DB を取得しました）。
 - 異常系: `.await` をまたいで `std::sync::Mutex` の guard を持つ関数が `await_holding_lock` で落ち、await の前に guard を手放すと通ること。`tokio::sync::mpsc::unbounded_channel`・`futures::channel::mpsc::unbounded` の呼び出しが`disallowed_methods` で落ちること（依存の代わりに path 依存の偽 crate を使用）。`bincode`・`actix` の偽 crate が `deps` 段で ban されること。
 - 設定してあるが、この leaf では実ツールで確かめていない規則: `await_holding_refcell_ref`、`await_holding_invalid_type`、`large_futures`。
-- 共通の段（unwrap・print・unsafe・missing docs・pedantic・`std::thread::sleep`・format・`[lints] workspace = true` 欠落・未使用依存・テスト0件・Cargo.lock なし・tool 不足・版違い・版の読み取り失敗・行カバレッジ90%未満・advisory DB の取得失敗とオフライン）の異常系は、同じ `scripts/check.sh` と共通設定を持つ game-realtime の leaf で実ツールの確認をしています。この leaf では繰り返していません。
+- 共通の段（unwrap・print・unsafe・missing docs・pedantic・`std::thread::sleep`・format・`[lints] workspace = true` 欠落・未使用依存・テスト0件・Cargo.lock なし・tool 不足・版違い・版の読み取り失敗・行カバレッジ90%未満・advisory DB の取得失敗とオフライン）の異常系は、byte 単位で同一の `scripts/check.sh` と共通設定を持つ game-realtime の leaf で実ツールの確認をしています。この leaf では繰り返していません。
 
 fixture は配布しません。**Linux・Windows での実行、CI、本物のサーバー依存（tokio など）での build は未実施**です。
 

@@ -117,7 +117,7 @@ tauri leaf と同じ stable 項目（幅100・4スペース・LF・edition 2024�
 | --- | --- | --- | --- | --- |
 | game-realtime | `arithmetic_side_effects`、`cast_possible_truncation`・`cast_sign_loss`・`cast_precision_loss`・`cast_possible_wrap`・`cast_lossless`、`as_conversions`、`indexing_slicing`、`float_cmp`、`float_arithmetic` は対象外（ゲームで使うため） | `std::time::SystemTime::now`、`std::time::Instant::now`（tick の時刻は引数で渡す）、`disallowed-types` で `std::hash::RandomState`・`std::collections::hash_map::RandomState`・`std::collections::HashMap`・`std::collections::HashSet`（既定 hasher は実行ごとに順序が変わる。`new`・`default`・`collect` すべてを止める。固定 hasher か `BTreeMap` を使う） | `laminar`（2021 で停止） | `lto = "fat"`、`codegen-units = 1` |
 | game-room | `await_holding_lock`、`await_holding_refcell_ref`、`await_holding_invalid_type`、`large_futures` | `tokio::sync::mpsc::unbounded_channel`・`futures::channel::mpsc::unbounded`（背圧なし） | `actix`（アクター。2024 で停止） | 共通のまま |
-| game-social | `await_holding_lock`、`await_holding_refcell_ref` | `sqlx::query`・`sqlx::query_as`（非マクロ。生 SQL 文字列を避けマクロで型検査）、`reqwest::Client::new`（timeout なし） | `native-tls`（rustls に限定） | 共通のまま |
+| game-social | `await_holding_lock`、`await_holding_refcell_ref` | `sqlx::query`・`sqlx::query_as`（非マクロ。生 SQL 文字列を避けマクロで型検査）、`reqwest::Client::new`・`reqwest::get`（timeout なし。`Client::default` は trait 実装のため Clippy では止められない） | `native-tls`（rustls に限定） | 共通のまま |
 
 - realtime の `Instant::now` 禁止は厳しい選択です（考察）。tick ループの入口1か所だけ、理由つき `#[expect]` で許す使い方を README に書きます。
 - `float_arithmetic` はゲームの物理で必須なので、どの leaf でも入れません（筆者の判断）。
@@ -186,3 +186,4 @@ tauri leaf と同じ stable 項目（幅100・4スペース・LF・edition 2024�
   - 2026-10-30: 実装時の最新版の導入と、scaffold-profiles への登録をユーザーが選択。
   - 2026-10-30（筆者の判断、builder check を受けて）: room の `tokio::spawn` 禁止を取り消し、realtime は `RandomState` 型ごと禁止、social は `SQLX_OFFLINE=true` を既定、依存つき禁止 API は偽 crate で検証、`check.ps1` は配布しない。
   - 2026-10-30（筆者の判断、実装時）: Clippy 1.99.1 は暗黙の RandomState を検出しないため、realtime は HashMap・HashSet 型自体を禁止
+  - 2026-10-31（筆者の判断、最終レビュー）: social は reqwest::Client::default と reqwest::get も禁止。ただし実ツールで確かめたところ、Clippy 1.99.1 の `disallowed-methods` は trait 実装のメソッド（`Client::default`）を型指定で止められなかったため、禁止したのは `reqwest::get` だけ。`Client::default` は README に未対応と明記。

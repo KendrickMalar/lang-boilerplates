@@ -27,13 +27,20 @@ mod tests {
 '''
 
 
+LINTS_FORMS = {
+    "table": ("", "\n[lints]\nworkspace = true\n"),
+    "dotted": ("lints.workspace = true\n\n", ""),
+    "inline": ("lints = { workspace = true }\n\n", ""),
+}
+
+
 def write_crate(root: Path, name: str, lib: str, *, workspace_lints: bool = True,
-                deps: str = "") -> None:
+                deps: str = "", lints_form: str = "table") -> None:
     crate = root / "crates" / name
     (crate / "src").mkdir(parents=True, exist_ok=True)
-    lints = "\n[lints]\nworkspace = true\n" if workspace_lints else ""
+    head, lints = LINTS_FORMS[lints_form] if workspace_lints else ("", "")
     (crate / "Cargo.toml").write_text(
-        f'[package]\nname = "{name}"\nversion = "0.1.0"\n'
+        f'{head}[package]\nname = "{name}"\nversion = "0.1.0"\n'
         'edition.workspace = true\nrust-version.workspace = true\npublish.workspace = true\n'
         f'\n[dependencies]\n{deps}\n{lints}')
     (crate / "src/lib.rs").write_text(lib)
@@ -177,6 +184,13 @@ pub fn wait() {
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("stage: format", result.stdout)
         self.assertNotIn("stage: lint", result.stdout)
+
+    def test_lints_workspace_true_forms_pass(self):
+        # Cargo accepts the table, the dotted key and the inline table.
+        for form in ("dotted", "inline"):
+            with self.subTest(form=form):
+                result = self.commit(self.project(lints_form=form))
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_member_without_workspace_lints_rejected(self):
         result = self.commit(self.project(workspace_lints=False))
@@ -464,13 +478,15 @@ FUTURES = """pub mod channel {
 SQLX = """pub fn query(_: &str) {}
 pub fn query_as(_: &str) {}
 """
-REQWEST = """pub struct Client;
+REQWEST = """pub struct Client(u8);
 
 impl Client {
     pub fn new() -> Self {
-        Self
+        Self(0)
     }
 }
+
+pub fn get(_: &str) {}
 """
 BANNED_LIB = "pub fn encode() {}\n"
 
@@ -557,13 +573,16 @@ pub fn run() {{
 }}
 '''), "#disallowed_methods")
 
-    def test_reqwest_client_new_rejected(self):
-        self.assert_rejected(self.lint_with("reqwest", REQWEST, '''
-/// Builds a client.
-#[must_use]
-pub fn client() -> reqwest::Client {
-    reqwest::Client::new()
-}
+    def test_reqwest_timeoutless_calls_rejected(self):
+        # `Client::default` is a trait-impl method; Clippy cannot name it per type (not banned).
+        for name, body in (("Client::new", "let _client = reqwest::Client::new();"),
+                           ("get", 'reqwest::get("https://example.invalid");')):
+            with self.subTest(call=name):
+                self.assert_rejected(self.lint_with("reqwest", REQWEST, f'''
+/// Calls a timeout-less reqwest entry point.
+pub fn call() {{
+    {body}
+}}
 '''), "#disallowed_methods")
 
     def test_social_without_sqlx_passes(self):

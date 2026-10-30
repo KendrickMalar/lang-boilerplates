@@ -96,12 +96,16 @@ metadata=$("$cargo" metadata --no-deps --locked --format-version 1) || fail 'car
 manifests=$(printf '%s\n' "$metadata" | grep -o '"manifest_path":"[^"]*"' | sed 's/^"manifest_path":"//; s/"$//')
 [ -n "$manifests" ] || fail 'no workspace members under crates/'
 
-# Every workspace member must inherit [workspace.lints].
+# Every workspace member must inherit [workspace.lints]. Cargo accepts three spellings:
+#   [lints] workspace = true  |  lints.workspace = true  |  lints = { workspace = true }
+# The last two are top-level keys, so they only count before the first [table] header.
 check_member_lints() {
     printf '%s\n' "$manifests" | while IFS= read -r manifest; do
         awk '
             /^[[:space:]]*\[/ { section = $0; gsub(/[[:space:]]/, "", section) }
             section == "[lints]" && /^[[:space:]]*workspace[[:space:]]*=[[:space:]]*true[[:space:]]*(#.*)?$/ { ok = 1 }
+            section == "" && /^[[:space:]]*lints[[:space:]]*\.[[:space:]]*workspace[[:space:]]*=[[:space:]]*true[[:space:]]*(#.*)?$/ { ok = 1 }
+            section == "" && /^[[:space:]]*lints[[:space:]]*=[[:space:]]*\{[[:space:]]*workspace[[:space:]]*=[[:space:]]*true[[:space:]]*,?[[:space:]]*\}[[:space:]]*(#.*)?$/ { ok = 1 }
             END { exit !ok }
         ' "$manifest" || fail "member must set [lints] workspace = true: $manifest"
     done

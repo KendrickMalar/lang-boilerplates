@@ -6,10 +6,18 @@
   既定 hasher を禁止、release は LTO 最大。Rust 1.99.1 / edition2024。品質設定のみ（依存・source なし）。
 - [ルーム制・WebSocket サーバーの品質設定](game-room/README.md): 容量なしキューと `.await` を
   またぐロックを禁止、actix を ban。Rust 1.99.1 / edition2024。品質設定のみ。
-- [ソシャゲ型 HTTP API の品質設定](game-social/README.md): 生の `sqlx::query`・timeout なし
-  `reqwest::Client` を禁止、native-tls を ban、`SQLX_OFFLINE` 既定。Rust 1.99.1 / edition2024。品質設定のみ。
+- [ソシャゲ型 HTTP API の品質設定](game-social/README.md): 生の `sqlx::query`・timeout なしの
+  `reqwest::Client::new`・`reqwest::get` を禁止、native-tls を ban、`SQLX_OFFLINE` 既定。Rust 1.99.1 / edition2024。品質設定のみ。
 
-3種類を併用するときは game-realtime を土台にして、他の leaf の禁止 API を足します。
+3種類を併用するときは game-realtime を土台にして、room・social の規則を次のとおり足します。
+
+- `Cargo.toml` の `[workspace.lints.clippy]`: room から `await_holding_lock`・`await_holding_refcell_ref`・
+  `await_holding_invalid_type`・`large_futures`、social から `await_holding_lock`・`await_holding_refcell_ref`（deny）。
+- `clippy.toml` の `disallowed-methods`: room の `tokio::sync::mpsc::unbounded_channel`・`futures::channel::mpsc::unbounded`、
+  social の `sqlx::query`・`sqlx::query_as`・`reqwest::Client::new`・`reqwest::get` を足します。まだ依存に無い crate の path なので、
+  各エントリに `allow-invalid = true` を付けたままにします。
+- `deny.toml` の `[bans]`: room の `actix`、social の `native-tls` を足します。
+- `scripts/check.sh`: social の `SQLX_OFFLINE` の4行を足します。足し忘れると、commit 時に sqlx のマクロが DB に接続しようとして落ちます。
 
 各 leaf は自己完結し、製品 source・fixture・cache は配布しません。
 コピー先と既存ファイル保護の手順は leaf README を参照してください。

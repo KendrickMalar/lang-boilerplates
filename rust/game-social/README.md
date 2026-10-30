@@ -110,6 +110,8 @@ advisories 段だけがネットワークを使います。RustSec の advisory 
 `advisory database could not be fetched (network required)` を出して非0で止まります。
 push 前にネットワークにつなぐか、`sh scripts/check.sh commit` までに留めてください。
 
+`NEXTEST_PROFILE=ci sh scripts/check.sh push` のように環境変数 `NEXTEST_PROFILE=ci` を付けると、nextest は `.config/nextest.toml` の `ci` profile（`fail-fast = false`）を使います。
+
 caller の `RUSTUP_HOME`、`CARGO_HOME`、`CARGO_TARGET_DIR` を尊重します。
 環境変数はコマンド単位で指定し、global の Rustup・Git・shell の設定を変えません。
 
@@ -130,7 +132,9 @@ caller の `RUSTUP_HOME`、`CARGO_HOME`、`CARGO_TARGET_DIR` を尊重します�
 
 - Clippy で deny: `await_holding_lock`、`await_holding_refcell_ref`（lock や `RefCell` の borrow を `.await` をまたいで持たない）。
 - 禁止 API: `sqlx::query`・`sqlx::query_as`（生 SQL 文字列は compile 時に検査されません。`query!`・`query_as!` マクロを使う）、
-  `reqwest::Client::new`（timeout がありません。`Client::builder().timeout(..)` で作る）。
+  `reqwest::Client::new`・`reqwest::get`（どちらも timeout がありません。`Client::builder().timeout(..)` で作った Client を使う）。
+  `reqwest::Client::default()` は止められません。Clippy の `disallowed-methods` は trait 実装のメソッドを型ごとに指定できないためです。
+  `Client::builder().timeout(..)` で作るのをレビューで確かめてください。
   まだ依存に無い crate の path なので `allow-invalid = true` を付けています。
 - `native-tls` は ban です（TLS は rustls に限定。`reqwest` は `default-features = false` と `rustls` の feature を使う）。
 
@@ -181,6 +185,8 @@ crate を公開する（`publish` を外す）ときは、`description`・`licen
 
 - ライセンスは MIT、Apache-2.0、BSD-2-Clause、BSD-3-Clause、ISC、Unicode-3.0、Zlib だけを許可します。ほかは利用側で追加します。
   自分の `publish = false` の crate はライセンス検査の対象外です（`[licenses.private] ignore = true`）。
+  この leaf が勧める rustls 構成（reqwest の `rustls`、sqlx の rustls 系 feature）は、たいてい `CDLA-Permissive-2.0`（webpki-roots）を `[licenses] allow` に足す必要があり、ほかにも要ることがあります（例: 暗号 backend の crate）。
+  `cargo deny check licenses` の出力で確かめて、必要なものを足してください。許可リストの初期値は変えていません。
 - ban: `bincode`（RUSTSEC-2025-0141）、`fred`、`poem`、`openssl`、`openssl-sys`、`native-tls`（rustls に限定。social 専用）。crates.io 以外の registry と git 依存は拒否します。
 - `[graph] targets` は書いていません。デプロイ先に合わせて、例えば `targets = ["x86_64-unknown-linux-gnu"]` を足します。
 
@@ -229,9 +235,9 @@ commit は未 stage・未追跡・index を隠す flag・検査中の stage 内�
 macOS（aarch64）で、隔離した RUSTUP_HOME・CARGO_HOME と最小の fixture crate を使い、実ツールで次を確かめています。
 
 - 正常系: 依存なしの clean な workspace で `commit` の全段が通ること、`push` の全段（format・lint・deps・test・coverage・advisories・build）がこの順で通ること（advisories は実際に RustSec の DB を取得しました）。
-- 異常系: `.await` をまたいで `std::sync::Mutex` の guard を持つ関数が `await_holding_lock` で落ち、await の前に guard を手放すと通ること。`sqlx::query`・`sqlx::query_as`・`reqwest::Client::new` の呼び出しが`disallowed_methods` で落ちること（path 依存の偽 crate を使用）。`bincode`・`native-tls` の偽 crate が `deps` 段で ban されること。sqlx なし（`.sqlx/` なし）で `commit` が通ること、`check.sh` が `env: SQLX_OFFLINE=true` を表示し、呼び出し側の指定を尊重すること。
+- 異常系: `.await` をまたいで `std::sync::Mutex` の guard を持つ関数が `await_holding_lock` で落ち、await の前に guard を手放すと通ること。`sqlx::query`・`sqlx::query_as`・`reqwest::Client::new`・`reqwest::get` の呼び出しが `disallowed_methods` で落ちること（path 依存の偽 crate を使用）。`bincode`・`native-tls` の偽 crate が `deps` 段で ban されること。sqlx なし（`.sqlx/` なし）で `commit` が通ること、`check.sh` が `env: SQLX_OFFLINE=true` を表示し、呼び出し側の指定を尊重すること。
 - 設定してあるが、この leaf では実ツールで確かめていない規則: `await_holding_refcell_ref`。
-- 共通の段（unwrap・print・unsafe・missing docs・pedantic・`std::thread::sleep`・format・`[lints] workspace = true` 欠落・未使用依存・テスト0件・Cargo.lock なし・tool 不足・版違い・版の読み取り失敗・行カバレッジ90%未満・advisory DB の取得失敗とオフライン）の異常系は、同じ `scripts/check.sh` と共通設定を持つ game-realtime の leaf で実ツールの確認をしています。この leaf では繰り返していません。
+- 共通の段（unwrap・print・unsafe・missing docs・pedantic・`std::thread::sleep`・format・`[lints] workspace = true` 欠落・未使用依存・テスト0件・Cargo.lock なし・tool 不足・版違い・版の読み取り失敗・行カバレッジ90%未満・advisory DB の取得失敗とオフライン）の異常系は、`SQLX_OFFLINE` の4行を除いて同じ `scripts/check.sh` と共通設定を持つ game-realtime の leaf で実ツールの確認をしています。この leaf では繰り返していません。
 
 fixture は配布しません。**Linux・Windows での実行、CI、本物のサーバー依存（tokio など）での build は未実施**です。
 

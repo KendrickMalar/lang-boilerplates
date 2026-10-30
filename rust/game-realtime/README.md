@@ -110,6 +110,8 @@ advisories 段だけがネットワークを使います。RustSec の advisory 
 `advisory database could not be fetched (network required)` を出して非0で止まります。
 push 前にネットワークにつなぐか、`sh scripts/check.sh commit` までに留めてください。
 
+`NEXTEST_PROFILE=ci sh scripts/check.sh push` のように環境変数 `NEXTEST_PROFILE=ci` を付けると、nextest は `.config/nextest.toml` の `ci` profile（`fail-fast = false`）を使います。
+
 caller の `RUSTUP_HOME`、`CARGO_HOME`、`CARGO_TARGET_DIR` を尊重します。
 環境変数はコマンド単位で指定し、global の Rustup・Git・shell の設定を変えません。
 
@@ -197,6 +199,7 @@ crate を公開する（`publish` を外す）ときは、`description`・`licen
 
 - ライセンスは MIT、Apache-2.0、BSD-2-Clause、BSD-3-Clause、ISC、Unicode-3.0、Zlib だけを許可します。ほかは利用側で追加します。
   自分の `publish = false` の crate はライセンス検査の対象外です（`[licenses.private] ignore = true`）。
+  rustls を使う構成（reqwest の `rustls`、sqlx の rustls 系 feature など）を入れる場合は、`CDLA-Permissive-2.0`（webpki-roots）などを `[licenses] allow` に足す必要が出ることがあります。`cargo deny check licenses` の出力で確かめてください。
 - ban: `bincode`（RUSTSEC-2025-0141）、`fred`、`poem`、`openssl`、`openssl-sys`、`laminar`（2021 で停止。realtime 専用）。crates.io 以外の registry と git 依存は拒否します。
 - `[graph] targets` は書いていません。デプロイ先に合わせて、例えば `targets = ["x86_64-unknown-linux-gnu"]` を足します。
 

@@ -11,4 +11,5 @@ disallowed-methods = [
     { path = "sqlx::query", reason = "unchecked SQL string; use the sqlx::query! macro (compile-time checked)", allow-invalid = true },
     { path = "sqlx::query_as", reason = "unchecked SQL string; use the sqlx::query_as! macro (compile-time checked)", allow-invalid = true },
     { path = "reqwest::Client::new", reason = "no timeout; build the client with Client::builder().timeout(..)", allow-invalid = true },
+    { path = "reqwest::get", reason = "builds a throwaway client with no timeout; use a shared Client built with Client::builder().timeout(..)", allow-invalid = true },
 ]
