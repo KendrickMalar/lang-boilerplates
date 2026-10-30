@@ -1,0 +1,11 @@
+# Tests may unwrap/expect/panic/print; product code may not.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-print-in-tests = true
+
+# Paths from crates that are not dependencies yet need `allow-invalid = true`.
+disallowed-methods = [
+    { path = "std::thread::sleep", reason = "blocks the async executor thread; use the runtime's sleep" },
+    { path = "std::process::exit", reason = "skips destructors and graceful shutdown; return from main" },
+]

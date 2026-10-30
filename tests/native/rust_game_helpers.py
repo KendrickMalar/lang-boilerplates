@@ -40,6 +40,19 @@ def copy_leaf(leaf: str, prefix: str) -> Path:
     return fixture
 
 
+def write_fake_crate(root: Path, name: str, lib: str) -> str:
+    """Create an unpublished stand-in crate under vendor/ and return its dependency line.
+
+    The workspace must exclude it: add `exclude = ["vendor"]` to `[workspace]`.
+    """
+    crate = root / "vendor" / name
+    (crate / "src").mkdir(parents=True, exist_ok=True)
+    (crate / "Cargo.toml").write_text(
+        f'[package]\nname = "{name}"\nversion = "0.1.0"\nedition = "2024"\npublish = false\n')
+    (crate / "src/lib.rs").write_text(lib)
+    return f'{name} = {{ path = "../../vendor/{name}" }}'
+
+
 def run_game(command: list[str], cwd: Path, *, online: bool = False) -> subprocess.CompletedProcess[str]:
     env = game_env(cwd, online=online)
     result = subprocess.run(command, cwd=cwd, env=env, text=True,

@@ -1,0 +1,8 @@
+/target/
+/.verification/
+.DS_Store
+# Cargo.lock belongs in the consuming application repository.
+
+# Husky tooling (lockfile remains tracked)
+/node_modules/
+/.husky/_/
