@@ -102,7 +102,7 @@
 - Consumes: Task 2 の `write_crate`、check.sh の段
 - Produces: `RealtimePushGateTests`、`RealtimeRuleTests`
 
-- [ ] **Step 1: 静的テストを足す** — `test_realtime_rules`: lints.clippy に `arithmetic_side_effects`・`cast_possible_truncation`・`cast_sign_loss`・`cast_precision_loss`・`cast_possible_wrap`・`cast_lossless`・`as_conversions`・`indexing_slicing`・`float_cmp` が `"deny"`、`float_arithmetic` は無い。clippy.toml の disallowed-methods に `std::time::SystemTime::now`・`std::time::Instant::now`、disallowed-types に `std::hash::RandomState`・`std::collections::hash_map::RandomState`。deny.toml の deny に `laminar`。profile.release に `lto == "fat"`、`codegen-units == 1`。
+- [ ] **Step 1: 静的テストを足す** — `test_realtime_rules`: lints.clippy に `arithmetic_side_effects`・`cast_possible_truncation`・`cast_sign_loss`・`cast_precision_loss`・`cast_possible_wrap`・`cast_lossless`・`as_conversions`・`indexing_slicing`・`float_cmp` が `"deny"`、`float_arithmetic` は無い。clippy.toml の disallowed-methods に `std::time::SystemTime::now`・`std::time::Instant::now`、disallowed-types に `std::hash::RandomState`・`std::collections::hash_map::RandomState`・`std::collections::HashMap`・`std::collections::HashSet`。deny.toml の deny に `laminar`。profile.release に `lto == "fat"`、`codegen-units == 1`。
 - [ ] **Step 2: 実ツールテストを書く** —
   - `RealtimePushGateTests.test_push_passes_with_full_coverage`: exit 0、`stage: coverage`・`stage: advisories`・`stage: build` が出る（`run_game(..., online=True)`。RustSec DB の取得先 `https://github.com/rustsec/advisory-db` を記録）
   - `test_coverage_below_90_rejected`: テストしない関数を足して行カバレッジを 90% 未満にする → 非0、stderr に `fail-under-lines` か `90`

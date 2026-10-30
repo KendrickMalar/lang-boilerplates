@@ -8,4 +8,15 @@ allow-print-in-tests = true
 disallowed-methods = [
     { path = "std::thread::sleep", reason = "blocks the async executor thread; use the runtime's sleep" },
     { path = "std::process::exit", reason = "skips destructors and graceful shutdown; return from main" },
+    # Realtime only: the simulation takes the tick time as an argument.
+    { path = "std::time::SystemTime::now", reason = "pass tick time in as an argument; read the clock only at the tick loop entry" },
+    { path = "std::time::Instant::now", reason = "pass tick time in as an argument; read the clock only at the tick loop entry" },
+]
+# Realtime only: the default hasher reorders iteration per run (blocks `new`, `default`, `collect`).
+disallowed-types = [
+    { path = "std::hash::RandomState", reason = "iteration order changes per run; use a fixed hasher or BTreeMap" },
+    { path = "std::collections::hash_map::RandomState", reason = "iteration order changes per run; use a fixed hasher or BTreeMap" },
+    # Clippy cannot see the implicit `S = RandomState` in `HashMap::new()` or `collect()`, so the types themselves are banned.
+    { path = "std::collections::HashMap", reason = "default hasher reorders iteration per run (non-deterministic); use BTreeMap, or one fixed-hasher alias with a reasoned #[expect]" },
+    { path = "std::collections::HashSet", reason = "default hasher reorders iteration per run (non-deterministic); use BTreeSet, or one fixed-hasher alias with a reasoned #[expect]" },
 ]

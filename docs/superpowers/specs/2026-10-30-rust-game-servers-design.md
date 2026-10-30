@@ -115,7 +115,7 @@ tauri leaf と同じ stable 項目（幅100・4スペース・LF・edition 2024�
 
 | leaf | 追加の lint（deny） | disallowed（clippy.toml） | deny.toml の追加 ban | release |
 | --- | --- | --- | --- | --- |
-| game-realtime | `arithmetic_side_effects`、`cast_possible_truncation`・`cast_sign_loss`・`cast_precision_loss`・`cast_possible_wrap`・`cast_lossless`、`as_conversions`、`indexing_slicing`、`float_cmp`、`float_arithmetic` は対象外（ゲームで使うため） | `std::time::SystemTime::now`、`std::time::Instant::now`（tick の時刻は引数で渡す）、`disallowed-types` で `std::hash::RandomState`・`std::collections::hash_map::RandomState`（既定 hasher は実行ごとに順序が変わる。`new`・`default`・`collect` すべてを止める。固定 hasher か `BTreeMap` を使う） | `laminar`（2021 で停止） | `lto = "fat"`、`codegen-units = 1` |
+| game-realtime | `arithmetic_side_effects`、`cast_possible_truncation`・`cast_sign_loss`・`cast_precision_loss`・`cast_possible_wrap`・`cast_lossless`、`as_conversions`、`indexing_slicing`、`float_cmp`、`float_arithmetic` は対象外（ゲームで使うため） | `std::time::SystemTime::now`、`std::time::Instant::now`（tick の時刻は引数で渡す）、`disallowed-types` で `std::hash::RandomState`・`std::collections::hash_map::RandomState`・`std::collections::HashMap`・`std::collections::HashSet`（既定 hasher は実行ごとに順序が変わる。`new`・`default`・`collect` すべてを止める。固定 hasher か `BTreeMap` を使う） | `laminar`（2021 で停止） | `lto = "fat"`、`codegen-units = 1` |
 | game-room | `await_holding_lock`、`await_holding_refcell_ref`、`await_holding_invalid_type`、`large_futures` | `tokio::sync::mpsc::unbounded_channel`・`futures::channel::mpsc::unbounded`（背圧なし） | `actix`（アクター。2024 で停止） | 共通のまま |
 | game-social | `await_holding_lock`、`await_holding_refcell_ref` | `sqlx::query`・`sqlx::query_as`（非マクロ。生 SQL 文字列を避けマクロで型検査）、`reqwest::Client::new`（timeout なし） | `native-tls`（rustls に限定） | 共通のまま |
 
@@ -185,3 +185,4 @@ tauri leaf と同じ stable 項目（幅100・4スペース・LF・edition 2024�
   - 2026-10-30: 3 leaf・品質設定のみ・最大級・1.99.1・種類ごとの差分案・行 90%・明示ライセンス・ツール導入をユーザーが選択。
   - 2026-10-30: 実装時の最新版の導入と、scaffold-profiles への登録をユーザーが選択。
   - 2026-10-30（筆者の判断、builder check を受けて）: room の `tokio::spawn` 禁止を取り消し、realtime は `RandomState` 型ごと禁止、social は `SQLX_OFFLINE=true` を既定、依存つき禁止 API は偽 crate で検証、`check.ps1` は配布しない。
+  - 2026-10-30（筆者の判断、実装時）: Clippy 1.99.1 は暗黙の RandomState を検出しないため、realtime は HashMap・HashSet 型自体を禁止

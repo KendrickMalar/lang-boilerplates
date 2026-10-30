@@ -28,6 +28,7 @@ deny = [
     { crate = "poem", reason = "no release since 2025-07; use axum" },
     { crate = "openssl", reason = "TLS is limited to rustls" },
     { crate = "openssl-sys", reason = "TLS is limited to rustls" },
+    { crate = "laminar", reason = "no release since 2021; use quinn or renet2" },
 ]
 
 [sources]

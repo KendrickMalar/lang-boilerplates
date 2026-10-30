@@ -4,11 +4,13 @@ set -eu
 fail() { printf '%s\n' "error: $*" >&2; exit 1; }
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
-[ "$#" -eq 1 ] || fail 'usage: check.sh <format|lint|deps|test|commit>'
+[ "$#" -eq 1 ] || fail 'usage: check.sh <format|lint|deps|test|coverage|advisories|build|commit|push|all>'
 stage=$1
 case "$stage" in
-    format|lint|deps|test) stages=$stage ;;
+    format|lint|deps|test|coverage|advisories|build) stages=$stage ;;
     commit) stages='format lint deps test' ;;
+    # advisories is the only stage that needs network (RustSec advisory DB).
+    push|all) stages='format lint deps test coverage advisories build' ;;
     *) fail "unknown stage: $stage" ;;
 esac
 [ -f rust-toolchain.toml ] || fail 'missing rust-toolchain.toml'
@@ -49,23 +51,35 @@ case "$version" in 'rustc 1.99.1 '*) ;; *) fail 'requires Rust 1.99.1' ;; esac
 "$clippy" --version
 
 # Cargo subcommands: found on PATH, exact pinned version, then called by absolute path.
+# Optional $3: subcommand the binary needs before --version (cargo-llvm-cov: llvm-cov).
 pinned_tool() {
     path=$(command -v "$1" 2>/dev/null) || fail "$1 $2 must already be installed; no automatic installation"
     [ -x "$path" ] || fail "tool is not executable: $path"
-    first=$("$path" --version 2>&1 | sed -n 1p) || fail "cannot read $1 version"
+    # Capture first so a non-zero exit from the tool itself is not hidden by a pipe.
+    probe=$("$path" ${3:+"$3"} --version 2>&1) || fail "cannot read $1 version"
+    first=$(printf '%s\n' "$probe" | sed -n 1p)
     pattern=$(printf '%s\n' "$2" | sed 's/\./\\./g')
     printf '%s\n' "$first" | grep -Eq "(^|[ :])$pattern( |\$)" || fail "requires $1 $2 (found: $first)"
     printf '%s\n' "$path"
 }
-case " $stages " in *' test '*)
+case " $stages " in *' test '*|*' coverage '*)
     nextest=$(pinned_tool cargo-nextest 0.9.150)
     printf '%s\n' "tool: $nextest"
     ;;
 esac
-case " $stages " in *' deps '*)
+case " $stages " in *' deps '*|*' advisories '*)
     deny=$(pinned_tool cargo-deny 0.20.2)
+    printf '%s\n' "tool: $deny"
+    ;;
+esac
+case " $stages " in *' deps '*)
     shear=$(pinned_tool cargo-shear 1.14.0)
-    printf '%s\n' "tool: $deny" "tool: $shear"
+    printf '%s\n' "tool: $shear"
+    ;;
+esac
+case " $stages " in *' coverage '*)
+    llvm_cov=$(pinned_tool cargo-llvm-cov 0.9.1 llvm-cov)
+    printf '%s\n' "tool: $llvm_cov"
     ;;
 esac
 
@@ -89,6 +103,26 @@ check_member_lints() {
     done
 }
 
+# The RustSec advisory DB (https://github.com/rustsec/advisory-db) is fetched into
+# $CARGO_HOME/advisory-dbs on every run; a stale cached copy is never used silently.
+offline_advisories='advisory database could not be fetched (network required)'
+check_advisories() {
+    case "${CARGO_NET_OFFLINE:-}" in
+        true|TRUE|True|1) fail "$offline_advisories: CARGO_NET_OFFLINE=$CARGO_NET_OFFLINE" ;;
+    esac
+    status=0
+    output=$("$deny" deny check advisories 2>&1) || status=$?
+    if [ "$status" -eq 0 ]; then
+        printf '%s\n' "$output"
+        return 0
+    fi
+    printf '%s\n' "$output" >&2
+    if printf '%s\n' "$output" | grep -Eqi 'failed to fetch|network'; then
+        fail "$offline_advisories"
+    fi
+    fail "cargo deny check advisories failed (exit $status)"
+}
+
 run_stage() {
     printf '%s\n' "stage: $1"
     case "$1" in
@@ -110,6 +144,10 @@ run_stage() {
                 printf '%s\n' 'doctests: skipped (no library targets)'
             fi
             ;;
+        # Line coverage floor: change 90 here and record why in the product README.
+        coverage) "$llvm_cov" llvm-cov nextest --workspace --locked --no-tests=fail --fail-under-lines 90 ;;
+        advisories) check_advisories ;;
+        build) "$cargo" build --workspace --locked --release ;;
     esac
 }
 for step in $stages; do run_stage "$step"; done

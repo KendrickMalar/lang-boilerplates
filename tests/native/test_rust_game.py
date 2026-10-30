@@ -45,7 +45,9 @@ def with_items(items: str) -> str:
     return f"{head}{items.strip()}\n\n#[cfg(test)]{tests}"
 
 
-class RealtimeCommitGateTests(unittest.TestCase):
+class RealtimeLeaf(unittest.TestCase):
+    """Fixture helpers for the game-realtime leaf (no tests of its own)."""
+
     def project(self, lib: str = CLEAN, *, root: Path | None = None, **crate) -> Path:
         root = root or copy_leaf("game-realtime", self._testMethodName.removeprefix("test_"))
         write_crate(root, "core", lib, **crate)
@@ -65,6 +67,8 @@ class RealtimeCommitGateTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn(needle, result.stderr)
 
+
+class RealtimeCommitGateTests(RealtimeLeaf):
     def test_clean_workspace_without_dependencies_passes(self):
         result = self.commit(self.project())
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -209,6 +213,19 @@ pub fn wait() {
                                 text=True, capture_output=True, check=False)
         self.assert_rejected(result, "requires cargo-nextest 0.9.150 (found: cargo-nextest 0.9.149)")
 
+    def test_failing_version_probe_rejected(self):
+        # A tool that prints the right version but exits non-zero is not trusted.
+        root = self.project()
+        env = game_env(root)
+        fake = root / "fakebin"
+        fake.mkdir()
+        (fake / "cargo-nextest").write_text("#!/bin/sh\necho 'cargo-nextest 0.9.150'\nexit 3\n")
+        (fake / "cargo-nextest").chmod(0o755)
+        env["PATH"] = os.pathsep.join([str(fake), env["PATH"]])
+        result = subprocess.run(["sh", "scripts/check.sh", "commit"], cwd=root, env=env,
+                                text=True, capture_output=True, check=False)
+        self.assert_rejected(result, "cannot read cargo-nextest version")
+
     def test_failure_stops_later_stages(self):
         lib = with_items('''
 /// Greets.
@@ -221,6 +238,177 @@ pub fn greet() {
         self.assertIn("stage: lint", result.stdout)
         self.assertNotIn("stage: deps", result.stdout)
         self.assertNotIn("stage: test", result.stdout)
+
+
+UNTESTED = with_items('''
+/// Scores a combo; deliberately left untested to drop line coverage.
+#[must_use]
+pub const fn combo(hits: u32) -> u32 {
+    let base = hits.saturating_mul(10);
+    let bonus = if hits > 5 { 50 } else { 0 };
+    let streak = if hits > 10 { 100 } else { 0 };
+    let total = base.saturating_add(bonus);
+    let total = total.saturating_add(streak);
+    let capped = if total > 1000 { 1000 } else { total };
+    capped.saturating_mul(2)
+}
+''')
+OFFLINE = "advisory database could not be fetched (network required)"
+PUSH_STAGES = ["format", "lint", "deps", "test", "coverage", "advisories", "build"]
+
+
+class RealtimePushGateTests(RealtimeLeaf):
+    def push(self, root: Path, *, online: bool = False,
+             stage: str = "push") -> subprocess.CompletedProcess[str]:
+        return run_game(["sh", "scripts/check.sh", stage], root, online=online)
+
+    def assert_stage_order(self, result: subprocess.CompletedProcess[str]):
+        positions = [result.stdout.find(f"stage: {name}") for name in PUSH_STAGES]
+        self.assertNotIn(-1, positions, result.stdout)
+        self.assertEqual(positions, sorted(positions))
+
+    def test_push_passes_with_full_coverage(self):
+        # Network: cargo-deny fetches the RustSec DB (https://github.com/rustsec/advisory-db)
+        # into the isolated CARGO_HOME/advisory-dbs.
+        result = self.push(self.project(), online=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assert_stage_order(result)
+
+    def test_all_is_push(self):
+        result = self.push(self.project(), online=True, stage="all")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assert_stage_order(result)
+
+    def test_coverage_below_90_rejected(self):
+        result = self.push(self.project(UNTESTED))
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("stage: coverage", result.stdout)
+        self.assertNotIn("stage: advisories", result.stdout)
+        self.assertTrue("fail-under-lines" in result.stderr or "90" in result.stderr,
+                        result.stderr)
+
+    def test_advisories_offline_failure_is_explained(self):
+        result = self.push(self.project())
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("stage: advisories", result.stdout)
+        self.assertNotIn("stage: build", result.stdout)
+        self.assertIn(OFFLINE, result.stderr)
+
+    def test_advisories_fetch_failure_is_explained(self):
+        # Online mode but an unreachable proxy: the real fetch fails without using the network.
+        root = self.project()
+        env = game_env(root, online=True)
+        for key in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY",
+                    "all_proxy"):
+            env[key] = "http://127.0.0.1:9"
+        result = subprocess.run(["sh", "scripts/check.sh", "advisories"], cwd=root, env=env,
+                                text=True, capture_output=True, check=False)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(OFFLINE, result.stderr)
+
+    def test_build_is_release(self):
+        result = self.push(self.project(), stage="build")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("stage: build", result.stdout)
+        self.assertIn("release", result.stderr)
+
+
+class RealtimeRuleTests(RealtimeLeaf):
+    def lint(self, items: str) -> subprocess.CompletedProcess[str]:
+        return run_game(["sh", "scripts/check.sh", "commit"], self.project(with_items(items)))
+
+    def test_unchecked_add_rejected(self):
+        self.assert_rejected(self.lint('''
+/// Adds two scores.
+#[must_use]
+pub const fn sum(left: u32, right: u32) -> u32 {
+    left + right
+}
+'''), "#arithmetic_side_effects")
+
+    def test_as_cast_rejected(self):
+        self.assert_rejected(self.lint('''
+/// Widens a score.
+#[must_use]
+pub const fn widen(value: u32) -> u64 {
+    value as u64
+}
+'''), "#as_conversions")
+
+    def test_indexing_rejected(self):
+        self.assert_rejected(self.lint('''
+/// Reads the first byte.
+#[must_use]
+pub const fn first(bytes: &[u8]) -> u8 {
+    bytes[0]
+}
+'''), "#indexing_slicing")
+
+    def test_instant_now_rejected(self):
+        self.assert_rejected(self.lint('''
+/// Reads the clock.
+#[must_use]
+pub fn now() -> std::time::Instant {
+    std::time::Instant::now()
+}
+'''), "#disallowed_methods")
+
+    def test_hashmap_new_rejected(self):
+        self.assert_rejected(self.lint('''
+/// Creates an empty table.
+#[must_use]
+pub fn table() -> std::collections::HashMap<u32, u32> {
+    std::collections::HashMap::new()
+}
+'''), "#disallowed_types")
+
+    def test_hashmap_collect_rejected(self):
+        self.assert_rejected(self.lint('''
+/// Indexes scores by themselves.
+#[must_use]
+pub fn table(scores: &[u32]) -> std::collections::HashMap<u32, u32> {
+    scores.iter().map(|&score| (score, score)).collect()
+}
+'''), "#disallowed_types")
+
+    def test_btreemap_passes(self):
+        result = self.lint('''
+/// Indexes scores by themselves in a deterministic order.
+#[must_use]
+pub fn table(scores: &[u32]) -> std::collections::BTreeMap<u32, u32> {
+    scores.iter().map(|&score| (score, score)).collect()
+}
+''')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_fixed_hasher_alias_with_expect_passes(self):
+        # The README pattern: one reasoned #[expect] on a fixed-hasher alias.
+        result = self.lint('''
+/// Hash map with a fixed hasher: iteration order is the same on every run.
+#[expect(clippy::disallowed_types, reason = "固定 hasher の alias")]
+pub type FixedMap<K, V> =
+    std::collections::HashMap<K, V, std::hash::BuildHasherDefault<std::hash::DefaultHasher>>;
+
+/// Indexes scores by themselves.
+#[must_use]
+pub fn table(scores: &[u32]) -> FixedMap<u32, u32> {
+    let mut map = FixedMap::default();
+    map.extend(scores.iter().map(|&score| (score, score)));
+    map
+}
+''')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_instant_now_with_expect_reason_passes(self):
+        result = self.lint('''
+/// Reads the clock once at the tick loop entry.
+#[must_use]
+#[expect(clippy::disallowed_methods, reason = "tick の入口")]
+pub fn tick_start() -> std::time::Instant {
+    std::time::Instant::now()
+}
+''')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 if __name__ == "__main__":

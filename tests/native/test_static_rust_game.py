@@ -20,6 +20,10 @@ RESTRICTION = ["unwrap_used", "expect_used", "panic", "todo", "unimplemented", "
 TAURI_LINTS = ["redundant_clone", "assigning_clones", "or_fun_call"]
 LICENSES = {"MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-3.0", "Zlib"}
 BANNED = {"bincode", "fred", "poem", "openssl", "openssl-sys"}
+REALTIME_LINTS = ["arithmetic_side_effects", "cast_possible_truncation", "cast_sign_loss",
+                  "cast_precision_loss", "cast_possible_wrap", "cast_lossless", "as_conversions",
+                  "indexing_slicing", "float_cmp"]
+REALTIME = ROOT / "rust/game-realtime"
 
 
 def toml(leaf: Path, name: str) -> dict:
@@ -99,6 +103,41 @@ class StaticRustGameTests(unittest.TestCase):
             if "://" not in link and not link.startswith("#"):
                 self.assertTrue((leaf / link).exists(), link)
                 self.assertTrue((leaf / link).resolve().is_relative_to(leaf.resolve()), link)
+
+    def test_realtime_rules(self):
+        manifest = toml(REALTIME, "Cargo.toml")
+        clippy = manifest["workspace"]["lints"]["clippy"]
+        for lint in REALTIME_LINTS:
+            self.assertEqual(clippy.get(lint), "deny", lint)
+        self.assertNotIn("float_arithmetic", clippy, "games need float arithmetic")
+        release = manifest["profile"]["release"]
+        self.assertEqual(release["lto"], "fat")
+        self.assertEqual(release["codegen-units"], 1)
+
+        clippy_conf = toml(REALTIME, "clippy.toml")
+        self.assertLessEqual({"std::time::SystemTime::now", "std::time::Instant::now"},
+                             disallowed(clippy_conf["disallowed-methods"]))
+        self.assertLessEqual({"std::hash::RandomState", "std::collections::hash_map::RandomState",
+                              "std::collections::HashMap", "std::collections::HashSet"},
+                             disallowed(clippy_conf["disallowed-types"]))
+
+        banned = {entry if isinstance(entry, str) else entry["crate"]
+                  for entry in toml(REALTIME, "deny.toml")["bans"]["deny"]}
+        self.assertIn("laminar", banned)
+
+    def test_realtime_push_stages(self):
+        script = (REALTIME / "scripts/check.sh").read_text()
+        for command in [
+            "llvm-cov nextest --workspace --locked --no-tests=fail --fail-under-lines 90",
+            "deny check advisories",
+            "build --workspace --locked --release",
+        ]:
+            self.assertTrue(command in script, command)
+        self.assertIn("advisory database could not be fetched (network required)", script)
+        readme = (REALTIME / "README.md").read_text()
+        for text in ["--fail-under-lines 90", "https://github.com/rustsec/advisory-db",
+                     "sh scripts/check.sh push", "cargo-llvm-cov | 0.9.1"]:
+            self.assertIn(text, readme)
 
 
 if __name__ == "__main__":
