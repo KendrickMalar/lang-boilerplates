@@ -16,6 +16,10 @@ RUST_FILES = {'README.md', 'LICENSE', 'rust-toolchain.toml', 'rustfmt.toml',
               'scripts/check.ps1', 'src-tauri/Cargo.toml', 'src-tauri/build.rs',
               'src-tauri/tauri.conf.json', 'src-tauri/capabilities/main.json',
               '.husky/pre-commit', '.husky/pre-push'}
+RUST_GAME_FILES = {'README.md', 'LICENSE', '.editorconfig', '.gitignore', 'rust-toolchain.toml',
+                   'rustfmt.toml', 'clippy.toml', 'deny.toml', 'Cargo.toml',
+                   '.config/nextest.toml', '.cargo/config.toml', 'scripts/check.sh',
+                   '.husky/pre-commit', '.husky/pre-push'}
 SWIFT_FILES = {'README.md', 'LICENSE', '.swift-format', '.swiftlint.yml',
                '.editorconfig', '.gitignore', 'Config/Quality.xcconfig',
                'Config/Debug.xcconfig', 'Config/Release.xcconfig',
@@ -45,7 +49,7 @@ def links(path):
 
 class CatalogTests(unittest.TestCase):
     def test_root_language_leaf_navigation(self):
-        for language, leaves in [('rust', ['tauri']), ('swift', ['macos', 'ios']),
+        for language, leaves in [('rust', ['tauri', 'game-realtime', 'game-room', 'game-social']), ('swift', ['macos', 'ios']),
                                  ('roblox', ['rojo']), ('godot', ['mobile']),
                                  ('blender', ['assets'])]:
             self.assertIn(f'./{language}/README.md', links(ROOT / 'README.md'))
@@ -56,7 +60,9 @@ class CatalogTests(unittest.TestCase):
     def test_independent_copy_exact_inventory_and_local_references(self):
         cache = ROOT / '.verification/native/catalog'
         cache.mkdir(parents=True, exist_ok=True)
-        for name, expected in [('rust/tauri', RUST_FILES), ('swift/macos', SWIFT_FILES),
+        for name, expected in [('rust/tauri', RUST_FILES), ('rust/game-realtime', RUST_GAME_FILES),
+                               ('rust/game-room', RUST_GAME_FILES),
+                               ('rust/game-social', RUST_GAME_FILES), ('swift/macos', SWIFT_FILES),
                                ('swift/ios', SWIFT_FILES), ('roblox/rojo', ROBLOX_FILES),
                                ('godot/mobile', GODOT_FILES), ('blender/assets', BLENDER_FILES)]:
             with self.subTest(leaf=name):
@@ -82,7 +88,11 @@ class CatalogTests(unittest.TestCase):
                 self.assertEqual(manifest['devDependencies']['husky'], '9.1.7')
                 self.assertNotIn('prepare', manifest['scripts'])
                 self.assertNotIn('postinstall', manifest['scripts'])
-                self.assertEqual(manifest['scripts']['check'], 'sh scripts/check.sh all')
+                game = name.startswith('rust/game-')
+                self.assertEqual(manifest['scripts']['check'],
+                                 'sh scripts/check.sh commit' if game else 'sh scripts/check.sh all')
+                if game:
+                    self.assertEqual(manifest['scripts']['check:git'], 'sh scripts/check.sh')
                 for hook in ['pre-commit', 'pre-push']:
                     mode = '' if hook == 'pre-commit' else ' push'
                     self.assertIn('exec node check-commit.mjs' + mode, (dest / '.husky' / hook).read_text().splitlines())

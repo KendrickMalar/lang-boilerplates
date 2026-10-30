@@ -13,6 +13,9 @@ import { ROOT } from "./helpers.mjs";
 
 const leaves = [
   "rust/tauri",
+  "rust/game-realtime",
+  "rust/game-room",
+  "rust/game-social",
   "swift/macos",
   "swift/ios",
   "roblox/rojo",
