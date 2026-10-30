@@ -1,0 +1,14 @@
+# Tests may unwrap/expect/panic/print; product code may not.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-print-in-tests = true
+
+# Paths from crates that are not dependencies yet need `allow-invalid = true`.
+disallowed-methods = [
+    { path = "std::thread::sleep", reason = "blocks the async executor thread; use the runtime's sleep" },
+    { path = "std::process::exit", reason = "skips destructors and graceful shutdown; return from main" },
+    { path = "sqlx::query", reason = "unchecked SQL string; use the sqlx::query! macro (compile-time checked)", allow-invalid = true },
+    { path = "sqlx::query_as", reason = "unchecked SQL string; use the sqlx::query_as! macro (compile-time checked)", allow-invalid = true },
+    { path = "reqwest::Client::new", reason = "no timeout; build the client with Client::builder().timeout(..)", allow-invalid = true },
+]

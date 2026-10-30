@@ -1,0 +1,7 @@
+# Zero discovered tests fail through `--no-tests=fail` in scripts/check.sh.
+[profile.default]
+fail-fast = true
+slow-timeout = { period = "60s", terminate-after = 2 }
+
+[profile.ci]
+fail-fast = false

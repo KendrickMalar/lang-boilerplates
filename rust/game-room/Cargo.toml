@@ -1,0 +1,58 @@
+# Virtual workspace manifest: add product crates under crates/<name>/ and give each
+# `[lints] workspace = true`. Product dependencies are intentionally not distributed.
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.99"
+publish = false
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+unused_must_use = "deny"
+unreachable_pub = "deny"
+unused_qualifications = "deny"
+rust_2018_idioms = { level = "deny", priority = -1 }
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+# Individually selected restriction lints (the restriction group is never enabled as a whole).
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+exit = "deny"
+get_unwrap = "deny"
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+undocumented_unsafe_blocks = "deny"
+mem_forget = "deny"
+string_slice = "deny"
+rc_mutex = "deny"
+lossy_float_literal = "deny"
+# Same three individually selected lints as the Tauri leaf.
+redundant_clone = "deny"
+assigning_clones = "deny"
+or_fun_call = "deny"
+# Async-safety lints for this server type.
+await_holding_lock = "deny"
+await_holding_refcell_ref = "deny"
+await_holding_invalid_type = "deny"
+large_futures = "deny"
+
+[profile.release]
+overflow-checks = true
+debug = "line-tables-only"
+# Servers catch panics per task/connection and keep running.
+panic = "unwind"

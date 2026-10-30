@@ -24,6 +24,13 @@ REALTIME_LINTS = ["arithmetic_side_effects", "cast_possible_truncation", "cast_s
                   "cast_precision_loss", "cast_possible_wrap", "cast_lossless", "as_conversions",
                   "indexing_slicing", "float_cmp"]
 REALTIME = ROOT / "rust/game-realtime"
+ROOM = ROOT / "rust/game-room"
+SOCIAL = ROOT / "rust/game-social"
+# Files that differ per leaf; every other file is byte-identical to the realtime leaf.
+# package.json differs only in its "name".
+PER_LEAF = {"README.md", "Cargo.toml", "clippy.toml", "deny.toml", "scripts/check.sh",
+            "package.json"}
+REALTIME_ONLY_METHODS = {"std::time::SystemTime::now", "std::time::Instant::now"}
 
 
 def toml(leaf: Path, name: str) -> dict:
@@ -42,6 +49,10 @@ class StaticRustGameTests(unittest.TestCase):
                 missing = [file for file in FILES if not (leaf / file).is_file()]
                 self.assertEqual(missing, [], f"{name}: missing settings")
                 self.check_common(leaf)
+                for file in FILES:
+                    if file not in PER_LEAF:
+                        self.assertEqual((leaf / file).read_bytes(),
+                                         (REALTIME / file).read_bytes(), f"{name}: {file}")
 
     def check_common(self, leaf: Path):
         toolchain = toml(leaf, "rust-toolchain.toml")["toolchain"]
@@ -124,6 +135,65 @@ class StaticRustGameTests(unittest.TestCase):
         banned = {entry if isinstance(entry, str) else entry["crate"]
                   for entry in toml(REALTIME, "deny.toml")["bans"]["deny"]}
         self.assertIn("laminar", banned)
+
+    def check_async_leaf(self, leaf: Path, lints: list[str], methods: set[str], ban: str):
+        manifest = toml(leaf, "Cargo.toml")
+        clippy = manifest["workspace"]["lints"]["clippy"]
+        for lint in lints:
+            self.assertEqual(clippy.get(lint), "deny", lint)
+        for lint in REALTIME_LINTS:
+            self.assertNotIn(lint, clippy, f"realtime-only lint: {lint}")
+        self.assertNotIn("float_arithmetic", clippy)
+        release = manifest["profile"]["release"]
+        self.assertNotIn("lto", release)
+        self.assertNotIn("codegen-units", release)
+
+        clippy_conf = toml(leaf, "clippy.toml")
+        self.assertEqual(disallowed(clippy_conf["disallowed-methods"]),
+                         {"std::thread::sleep", "std::process::exit"} | methods)
+        self.assertFalse(REALTIME_ONLY_METHODS & disallowed(clippy_conf["disallowed-methods"]))
+        self.assertNotIn("disallowed-types", clippy_conf)
+        for entry in clippy_conf["disallowed-methods"]:
+            if entry["path"] in methods:
+                self.assertIs(entry.get("allow-invalid"), True, entry["path"])
+
+        banned = {entry["crate"] for entry in toml(leaf, "deny.toml")["bans"]["deny"]}
+        self.assertIn(ban, banned)
+        self.assertNotIn("laminar", banned)
+        readme = (leaf / "README.md").read_text()
+        for text in ["tick", "RandomState", "laminar", "fat"]:
+            self.assertNotIn(text, readme, f"realtime-only README text: {text}")
+
+    def test_room_rules(self):
+        self.check_async_leaf(
+            ROOM,
+            ["await_holding_lock", "await_holding_refcell_ref", "await_holding_invalid_type",
+             "large_futures"],
+            {"tokio::sync::mpsc::unbounded_channel", "futures::channel::mpsc::unbounded"},
+            "actix")
+        self.assertNotIn("SQLX_OFFLINE", (ROOM / "scripts/check.sh").read_text())
+
+    def test_social_rules(self):
+        self.check_async_leaf(
+            SOCIAL, ["await_holding_lock", "await_holding_refcell_ref"],
+            {"sqlx::query", "sqlx::query_as", "reqwest::Client::new"}, "native-tls")
+        clippy = toml(SOCIAL, "Cargo.toml")["workspace"]["lints"]["clippy"]
+        self.assertNotIn("await_holding_invalid_type", clippy)
+        self.assertNotIn("large_futures", clippy)
+        script = (SOCIAL / "scripts/check.sh").read_text()
+        self.assertIn("SQLX_OFFLINE=${SQLX_OFFLINE:-true}\nexport SQLX_OFFLINE\n", script)
+        readme = (SOCIAL / "README.md").read_text()
+        for text in ["cargo sqlx prepare", ".sqlx/", "SQLX_OFFLINE=true"]:
+            self.assertIn(text, readme)
+
+    def test_push_stages_identical_in_all_leaves(self):
+        # Shared check.sh logic is the realtime script except for the social SQLX lines.
+        realtime = (REALTIME / "scripts/check.sh").read_text()
+        self.assertEqual((ROOM / "scripts/check.sh").read_text(), realtime)
+        social = (SOCIAL / "scripts/check.sh").read_text()
+        kept = [line for line in social.splitlines(keepends=True)
+                if "SQLX" not in line and "sqlx macros check" not in line]
+        self.assertEqual("".join(kept), realtime)
 
     def test_realtime_push_stages(self):
         script = (REALTIME / "scripts/check.sh").read_text()

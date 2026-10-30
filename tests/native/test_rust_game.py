@@ -4,7 +4,7 @@ import subprocess
 import unittest
 from pathlib import Path
 
-from tests.native.rust_game_helpers import (CACHE, copy_leaf, game_env, run_game,
+from tests.native.rust_game_helpers import (CACHE, LEAVES, copy_leaf, game_env, run_game,
                                             write_fake_crate)
 
 CLEAN = '''//! Core game rules.
@@ -46,14 +46,15 @@ def with_items(items: str) -> str:
 
 
 class RealtimeLeaf(unittest.TestCase):
-    """Fixture helpers for the game-realtime leaf (no tests of its own)."""
+    """Fixture helpers for one game leaf (no tests of its own); subclasses set `leaf`."""
 
     # Fixture directory prefix. None: the test name. Set a neutral one when a needle could
     # otherwise match the fixture path that tools echo (e.g. `Compiling core v0.1.0 (<path>)`).
     prefix: str | None = None
+    leaf = "game-realtime"
 
     def project(self, lib: str = CLEAN, *, root: Path | None = None, **crate) -> Path:
-        root = root or copy_leaf("game-realtime",
+        root = root or copy_leaf(self.leaf,
                                  self.prefix or self._testMethodName.removeprefix("test_"))
         write_crate(root, "core", lib, **crate)
         if "deps" in crate:
@@ -445,6 +446,142 @@ pub fn tick_start() -> std::time::Instant {
 }
 ''')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+
+# Stand-in crates, pre-formatted: `cargo fmt --all` also checks path dependencies.
+TOKIO = """pub mod sync {
+    pub mod mpsc {
+        pub fn unbounded_channel() {}
+    }
+}
+"""
+FUTURES = """pub mod channel {
+    pub mod mpsc {
+        pub fn unbounded() {}
+    }
+}
+"""
+SQLX = """pub fn query(_: &str) {}
+pub fn query_as(_: &str) {}
+"""
+REQWEST = """pub struct Client;
+
+impl Client {
+    pub fn new() -> Self {
+        Self
+    }
+}
+"""
+BINCODE = "pub fn encode() {}\n"
+
+
+class FakeDependencyLeaf(RealtimeLeaf):
+    """Rule checks that need a dependency: a path-only stand-in crate keeps them offline."""
+
+    prefix = "fakedep"
+
+    def lint_with(self, crate: str, fake_lib: str, items: str) -> subprocess.CompletedProcess[str]:
+        root = copy_leaf(self.leaf, self.prefix)
+        dep = write_fake_crate(root, crate, fake_lib)
+        return self.commit(self.project(with_items(items), root=root, deps=dep))
+
+
+class RoomRuleTests(FakeDependencyLeaf):
+    leaf = "game-room"
+
+    def test_unbounded_channel_rejected(self):
+        self.assert_rejected(self.lint_with("tokio", TOKIO, '''
+/// Opens a queue.
+pub fn queue() {
+    tokio::sync::mpsc::unbounded_channel();
+}
+'''), "#disallowed_methods")
+
+    def test_futures_unbounded_rejected(self):
+        self.assert_rejected(self.lint_with("futures", FUTURES, '''
+/// Opens a queue.
+pub fn queue() {
+    futures::channel::mpsc::unbounded();
+}
+'''), "#disallowed_methods")
+
+
+class SocialRuleTests(FakeDependencyLeaf):
+    leaf = "game-social"
+
+    def test_raw_sqlx_query_rejected(self):
+        for call in ("query", "query_as"):
+            with self.subTest(call=call):
+                self.assert_rejected(self.lint_with("sqlx", SQLX, f'''
+/// Runs a raw query.
+pub fn run() {{
+    sqlx::{call}("SELECT 1");
+}}
+'''), "#disallowed_methods")
+
+    def test_reqwest_client_new_rejected(self):
+        self.assert_rejected(self.lint_with("reqwest", REQWEST, '''
+/// Builds a client.
+#[must_use]
+pub fn client() -> reqwest::Client {
+    reqwest::Client::new()
+}
+'''), "#disallowed_methods")
+
+    def test_social_without_sqlx_passes(self):
+        root = self.project()
+        self.assertFalse((root / ".sqlx").exists())
+        result = self.commit(root)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_social_sets_sqlx_offline(self):
+        result = self.commit(self.project())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("env: SQLX_OFFLINE=true\n", result.stdout)
+
+    def test_social_keeps_caller_sqlx_offline(self):
+        root = self.project()
+        env = game_env(root)
+        env["SQLX_OFFLINE"] = "false"
+        result = subprocess.run(["sh", "scripts/check.sh", "format"], cwd=root, env=env,
+                                text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("env: SQLX_OFFLINE=false\n", result.stdout)
+
+
+class RoomAndSocialTests(unittest.TestCase):
+    def test_room_and_social_clean_commit_passes(self):
+        for leaf in ("game-room", "game-social"):
+            with self.subTest(leaf=leaf):
+                root = copy_leaf(leaf, "cleancommit")
+                write_crate(root, "core", CLEAN)
+                locked = run_game(["cargo", "generate-lockfile", "--offline"], root)
+                self.assertEqual(locked.returncode, 0, locked.stderr)
+                result = run_game(["sh", "scripts/check.sh", "commit"], root)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                for stage in ("format", "lint", "deps", "test"):
+                    self.assertIn(f"stage: {stage}", result.stdout)
+
+    def test_banned_crate_rejected(self):
+        # bincode is banned in every leaf; the stand-in crate is named after it.
+        for leaf in LEAVES:
+            with self.subTest(leaf=leaf):
+                root = copy_leaf(leaf, "dep")
+                dep = write_fake_crate(root, "bincode", BINCODE)
+                write_crate(root, "core", with_items('''
+/// Encodes.
+pub fn encode() {
+    bincode::encode();
+}
+'''), deps=dep)
+                manifest = root / "Cargo.toml"
+                manifest.write_text(manifest.read_text().replace(
+                    'members = ["crates/*"]\n', 'members = ["crates/*"]\nexclude = ["vendor"]\n'))
+                locked = run_game(["cargo", "generate-lockfile", "--offline"], root)
+                self.assertEqual(locked.returncode, 0, locked.stderr)
+                result = run_game(["sh", "scripts/check.sh", "deps"], root)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn("error[banned]: crate 'bincode = 0.1.0' is explicitly banned", result.stderr)
 
 
 if __name__ == "__main__":
