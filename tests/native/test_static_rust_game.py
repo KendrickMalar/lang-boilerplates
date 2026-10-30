@@ -128,14 +128,16 @@ class StaticRustGameTests(unittest.TestCase):
     def test_realtime_push_stages(self):
         script = (REALTIME / "scripts/check.sh").read_text()
         for command in [
-            "llvm-cov nextest --workspace --locked --no-tests=fail --fail-under-lines 90",
+            'llvm-cov nextest --workspace --locked --no-tests=fail --fail-under-lines "$line_floor"',
+            "line_floor=90\n",
             "deny check advisories",
             "build --workspace --locked --release",
         ]:
             self.assertTrue(command in script, command)
         self.assertIn("advisory database could not be fetched (network required)", script)
         readme = (REALTIME / "README.md").read_text()
-        for text in ["--fail-under-lines 90", "https://github.com/rustsec/advisory-db",
+        for text in ["`line_floor=90`", "line coverage below 90% (--fail-under-lines 90)",
+                     "https://github.com/rustsec/advisory-db",
                      "sh scripts/check.sh push", "cargo-llvm-cov | 0.9.1"]:
             self.assertIn(text, readme)
 

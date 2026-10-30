@@ -103,6 +103,24 @@ check_member_lints() {
     done
 }
 
+# Line coverage floor: change it only here and record why in the product README.
+line_floor=90
+check_coverage() {
+    status=0
+    report=$("$llvm_cov" llvm-cov nextest --workspace --locked --no-tests=fail --fail-under-lines "$line_floor") || status=$?
+    printf '%s\n' "$report"
+    [ "$status" -ne 0 ] || return 0
+    # cargo-llvm-cov exits 1 under the floor without saying so; the report's TOTAL line
+    # ($10 = line cover) tells a threshold miss apart from failing tests or missing tools.
+    if printf '%s\n' "$report" | awk -v floor="$line_floor" '
+        $1 == "TOTAL" && $10 ~ /^[0-9.]+%$/ { found = 1; below = ($10 + 0 < floor) }
+        END { exit !(found && below) }
+    '; then
+        fail "line coverage below ${line_floor}% (--fail-under-lines $line_floor)"
+    fi
+    exit "$status"
+}
+
 # The RustSec advisory DB (https://github.com/rustsec/advisory-db) is fetched into
 # $CARGO_HOME/advisory-dbs on every run; a stale cached copy is never used silently.
 offline_advisories='advisory database could not be fetched (network required)'
@@ -117,7 +135,8 @@ check_advisories() {
         return 0
     fi
     printf '%s\n' "$output" >&2
-    if printf '%s\n' "$output" | grep -Eqi 'failed to fetch|network'; then
+    # cargo-deny's own fetch error, not advisory text (which may mention "network").
+    if printf '%s\n' "$output" | grep -Eq '\[ERROR\] failed to fetch advisory database'; then
         fail "$offline_advisories"
     fi
     fail "cargo deny check advisories failed (exit $status)"
@@ -144,8 +163,7 @@ run_stage() {
                 printf '%s\n' 'doctests: skipped (no library targets)'
             fi
             ;;
-        # Line coverage floor: change 90 here and record why in the product README.
-        coverage) "$llvm_cov" llvm-cov nextest --workspace --locked --no-tests=fail --fail-under-lines 90 ;;
+        coverage) check_coverage ;;
         advisories) check_advisories ;;
         build) "$cargo" build --workspace --locked --release ;;
     esac

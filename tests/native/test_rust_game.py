@@ -48,8 +48,13 @@ def with_items(items: str) -> str:
 class RealtimeLeaf(unittest.TestCase):
     """Fixture helpers for the game-realtime leaf (no tests of its own)."""
 
+    # Fixture directory prefix. None: the test name. Set a neutral one when a needle could
+    # otherwise match the fixture path that tools echo (e.g. `Compiling core v0.1.0 (<path>)`).
+    prefix: str | None = None
+
     def project(self, lib: str = CLEAN, *, root: Path | None = None, **crate) -> Path:
-        root = root or copy_leaf("game-realtime", self._testMethodName.removeprefix("test_"))
+        root = root or copy_leaf("game-realtime",
+                                 self.prefix or self._testMethodName.removeprefix("test_"))
         write_crate(root, "core", lib, **crate)
         if "deps" in crate:
             manifest = root / "Cargo.toml"
@@ -254,10 +259,13 @@ pub const fn combo(hits: u32) -> u32 {
 }
 ''')
 OFFLINE = "advisory database could not be fetched (network required)"
+COVERAGE = "error: line coverage below 90% (--fail-under-lines 90)"
 PUSH_STAGES = ["format", "lint", "deps", "test", "coverage", "advisories", "build"]
 
 
 class RealtimePushGateTests(RealtimeLeaf):
+    prefix = "push"
+
     def push(self, root: Path, *, online: bool = False,
              stage: str = "push") -> subprocess.CompletedProcess[str]:
         return run_game(["sh", "scripts/check.sh", stage], root, online=online)
@@ -284,8 +292,14 @@ class RealtimePushGateTests(RealtimeLeaf):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("stage: coverage", result.stdout)
         self.assertNotIn("stage: advisories", result.stdout)
-        self.assertTrue("fail-under-lines" in result.stderr or "90" in result.stderr,
-                        result.stderr)
+        self.assertIn("1 test run: 1 passed", result.stderr)  # the tests themselves passed
+        self.assertIn(COVERAGE, result.stderr)
+
+    def test_failing_test_under_coverage_is_not_a_threshold_miss(self):
+        result = self.push(self.project(CLEAN.replace("3);", "4);")), stage="coverage")
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("1 failed", result.stderr)
+        self.assertNotIn(COVERAGE, result.stderr)
 
     def test_advisories_offline_failure_is_explained(self):
         result = self.push(self.project())
@@ -306,11 +320,33 @@ class RealtimePushGateTests(RealtimeLeaf):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn(OFFLINE, result.stderr)
 
+    def test_advisory_mentioning_network_is_not_a_fetch_failure(self):
+        # A real advisory needs a registry crate in Cargo.lock, which cannot be resolved
+        # offline from path-only fixtures; a stand-in cargo-deny 0.20.2 prints one instead.
+        root = self.project()
+        fake = root / "fakebin"
+        fake.mkdir()
+        (fake / "cargo-deny").write_text(
+            "#!/bin/sh\n"
+            'if [ "$1" = "--version" ]; then echo "cargo-deny 0.20.2"; exit 0; fi\n'
+            "echo 'error[vulnerability]: Remote network peer can exhaust memory' >&2\n"
+            "echo '  ID: RUSTSEC-2099-0001' >&2\n"
+            "exit 1\n")
+        (fake / "cargo-deny").chmod(0o755)
+        env = game_env(root, online=True)
+        env["PATH"] = os.pathsep.join([str(fake), env["PATH"]])
+        result = subprocess.run(["sh", "scripts/check.sh", "advisories"], cwd=root, env=env,
+                                text=True, capture_output=True, check=False)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("RUSTSEC-2099-0001", result.stderr)
+        self.assertIn("cargo deny check advisories failed (exit 1)", result.stderr)
+        self.assertNotIn(OFFLINE, result.stderr)
+
     def test_build_is_release(self):
         result = self.push(self.project(), stage="build")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("stage: build", result.stdout)
-        self.assertIn("release", result.stderr)
+        self.assertIn("Finished `release` profile", result.stderr)
 
 
 class RealtimeRuleTests(RealtimeLeaf):

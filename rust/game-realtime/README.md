@@ -95,12 +95,14 @@ tool 不足・版違い・source なし・Cargo.lock なし・テスト0件は�
 | lint | 全 member の `[lints] workspace = true` の検査、`cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | なし |
 | deps | `cargo shear`、`cargo deny --offline check bans licenses sources` | なし |
 | test | `cargo nextest run --workspace --locked --no-tests=fail`、`cargo test --doc --workspace --locked`（library target が無いときは doctest を飛ばす） | なし |
-| coverage | `cargo llvm-cov nextest --workspace --locked --no-tests=fail --fail-under-lines 90` | なし |
+| coverage | `cargo llvm-cov nextest --workspace --locked --no-tests=fail --fail-under-lines "$line_floor"`（`line_floor=90`） | なし |
 | advisories | `cargo deny check advisories`（RustSec の advisory DB を取得） | **あり** |
 | build | `cargo build --workspace --locked --release` | なし |
 
-行カバレッジの下限は **90%** です（doctest は数えません）。変えるときは `scripts/check.sh` の coverage 段にある
-`--fail-under-lines 90` の数値を変え、理由を製品 README に残してください。
+行カバレッジの下限は **90%** です（doctest は数えません）。変えるときは `scripts/check.sh` の
+`line_floor=90` の数値を変え、理由を製品 README に残してください（`--fail-under-lines` とエラー文はこの値を使います）。
+下限を割ると `error: line coverage below 90% (--fail-under-lines 90)` を出して非0で止まります。
+テストの失敗は、この文言を出さずに nextest の結果のまま止まります。
 
 advisories 段だけがネットワークを使います。RustSec の advisory DB を
 <https://github.com/rustsec/advisory-db> から毎回取得し、`$CARGO_HOME/advisory-dbs` に保存します。
