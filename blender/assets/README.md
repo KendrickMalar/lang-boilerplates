@@ -21,6 +21,7 @@ Blender **5.2.2 LTS**（同梱 Python 3.13）、ruff **0.17.0**、glTF-Transform
 | [.husky/pre-commit](.husky/pre-commit) | `.husky/pre-commit` |
 | [.husky/pre-push](.husky/pre-push) | `.husky/pre-push` |
 | [LICENSE](LICENSE) | `LICENSE.lang-boilerplates` |
+| 選んだアーキテクチャの `architecture/<選択肢>/` の中身 | 同じ相対位置（「アーキテクチャ」節） |
 | この README | 参照用。製品 README を上書きしない |
 
 コピー前に既存ファイル・symlink・Git hooksPath/フックを読み取り、差分を提示して承認を得てください。
@@ -63,6 +64,101 @@ blender -b --factory-startup --python-exit-code 1 --python scripts/build.py -- -
 （godot/mobile-game）と組で使う場合は、ゲーム側の `assets/` などへコピーしてください（Godot は `.glb` を
 そのまま取り込みます）。
 
+## アーキテクチャ
+
+scaffold の仕様策定でこの節の選択肢を人に提示し、基本設計で選ばれた選択肢の規則と強制設定を導入します。
+強制設定は ruff（TID251 banned-api・TID252 相対 import 禁止）の入れ子設定で、`sh scripts/check.sh lint` が依存の向きの違反で非0になります。
+`architecture/` 自体は製品へコピーしません（コピー前の雛形なので `pyproject.toml` の `extend-exclude` で ruff の対象外にしています）。
+
+### 選び方
+
+- 形の計算（配置・頂点・曲線など）を Blender なしで試験したいか → はいなら「純粋な形状計算＋bpy の変換役」
+- 計算が多く、同じ計算を複数のモデルで使うか → はいなら「純粋な形状計算＋bpy の変換役」
+- モデルは主に bpy の基本形状を組み合わせるだけか → はいなら「フラット＋共通部品」
+- 迷ったら既定の「フラット＋共通部品」で始め、計算が増えたら parts/ の計算を geometry/ へ移します
+
+### フラット＋共通部品（既定）
+
+モデル1つ＝1ファイル。モデル同士で共有する処理だけを parts/ に置きます。
+
+```mermaid
+flowchart LR
+  models["models/*.py（build()）"] --> parts["parts/（bpy 可）"]
+  parts --> bpy["bpy"]
+  models --> bpy
+```
+
+```text
+models/<name>.py   build() を定義。bpy と parts を使う
+parts/<topic>.py   複数モデルで使う部品（bpy 可）
+tests/test_*.py    Blender 内の unittest（models・parts を import 可）
+```
+
+| 規則 | 強さ |
+| --- | --- |
+| models は parts と bpy を import してよい | MUST |
+| models は別の model を import しない（`models` の import・相対 import） | MUST NOT |
+| parts は models を import しない | MUST NOT |
+| 2つ以上のモデルで使う処理は parts へ移す | MUST |
+
+- 向く: 小物・背景などの単純なモデルが多い。モデルごとに作りが違う
+- 向かない: 形の計算が多く、Blender なしで試験したい
+
+強制設定: [architecture/flat/models/ruff.toml](architecture/flat/models/ruff.toml)、
+[architecture/flat/parts/ruff.toml](architecture/flat/parts/ruff.toml)。
+
+1. 2ファイルを `models/ruff.toml`・`parts/ruff.toml` へコピーします（`extend = "../pyproject.toml"` で leaf の設定を引き継ぎます）
+2. `parts/` を作ります。`scripts/check.sh` の lint・format は `models parts geometry tests scripts` のうち存在するディレクトリを検査します
+3. `scripts/build.py` は leaf の root を `sys.path` に入れるので、モデルから `from parts import shapes` と書けます
+4. `sh scripts/check.sh lint` で確認します。違反は `TID251`（`models` の import）・`TID252`（相対 import）で非0です
+
+### 純粋な形状計算＋bpy の変換役
+
+形の計算を geometry/ に閉じ込め、bpy への変換は parts/ だけが行います。geometry/ は Blender なしで試験できます。
+
+```mermaid
+flowchart LR
+  models["models/*.py（build()）"] --> parts["parts/（bpy への変換役）"]
+  parts --> geometry["geometry/（純粋な計算・bpy 禁止）"]
+  parts --> bpy["bpy"]
+  models --> bpy
+```
+
+```text
+models/<name>.py     build() を定義。parts を呼ぶ
+parts/<topic>.py     geometry の結果を bpy のメッシュ・オブジェクトにする
+geometry/<topic>.py  タプル・list・float だけで形を計算する（bpy・mathutils 禁止）
+tests/test_*.py      Blender 内の unittest。geometry の試験は素の Python 3.13 でも動く
+```
+
+| 規則 | 強さ |
+| --- | --- |
+| フラット＋共通部品の規則すべて | MUST |
+| geometry は `bpy`・`bmesh`・`mathutils`・`bpy_extras`・`gpu` を import しない | MUST NOT |
+| geometry は parts・models を import しない | MUST NOT |
+| parts は geometry と bpy を import してよい | MUST |
+| 形の計算は geometry に置き、parts は変換だけにする | MUST |
+
+- 向く: 配置・頂点・曲線の計算が多い。計算を Blender なしで素早く試験したい
+- 向かない: bpy の基本形状を並べるだけの小さなモデル（層が増えるだけ）
+
+強制設定: [architecture/geometry/models/ruff.toml](architecture/geometry/models/ruff.toml)、
+[architecture/geometry/parts/ruff.toml](architecture/geometry/parts/ruff.toml)、
+[architecture/geometry/geometry/ruff.toml](architecture/geometry/geometry/ruff.toml)。
+
+1. 3ファイルを `models/ruff.toml`・`parts/ruff.toml`・`geometry/ruff.toml` へコピーします
+2. `geometry/ruff.toml` は `extend = "../parts/ruff.toml"` で parts の規則（models 禁止・相対 import 禁止）を引き継ぎ、
+   `extend-banned-api` で Blender のモジュールと parts を足します。ruff の per-file-ignores はルール番号単位なので、
+   「models 禁止は全体、bpy 禁止は geometry だけ」を1つの設定で書けないため入れ子にしています
+3. 以降はフラット＋共通部品の手順 2〜4 と同じです
+
+### 検出できないもの
+
+ruff は文字列で書いた import を追えません。`importlib.import_module("bpy")`・`__import__("bpy")`・
+`importlib.util.spec_from_file_location` で読む書き方は検出されないため、レビューで止めます。
+ruff 0.17.0 で確認しました（`import bpy`・`from bpy import x`・`import bpy.types`・
+`from bpy.types import Mesh`・`import models.x`・`from models import x`・`from . import x` は検出）。
+
 ## チェック
 
 ```sh
@@ -73,8 +169,8 @@ sh scripts/check.sh build # format|lint|test|build|all
 | 段階 | コマンド |
 | --- | --- |
 | 事前確認 | blender・ruff・gltf-transform の版が一致するか |
-| format | `ruff format --check models tests scripts` |
-| lint | `ruff check models tests scripts` |
+| format | `ruff format --check`（models・parts・geometry・tests・scripts のうち存在するもの） |
+| lint | `ruff check`（同上） |
 | test | Blender 内で `tests/test_*.py` を unittest 実行（0件は失敗） |
 | build | 一時ディレクトリへ全モデルを書き出し、`gltf-transform validate` で検査して削除 |
 
