@@ -19,7 +19,12 @@ SWIFT_FILES = {'README.md', 'LICENSE', '.swift-format', '.swiftlint.yml',
                '.editorconfig', '.gitignore', 'Config/Quality.xcconfig',
                'Config/Debug.xcconfig', 'Config/Release.xcconfig',
                'Config/VerifyUnsigned.xcconfig', 'scripts/check.sh',
-               '.husky/pre-commit', '.husky/pre-push'}
+               '.husky/pre-commit', '.husky/pre-push',
+               'architecture/thin-app-packages/Package.swift.example',
+               'architecture/thin-app-packages/swiftlint-rules.yml',
+               'architecture/thin-app-packages/check-architecture.sh',
+               'architecture/single-target/swiftlint-rules.yml',
+               'architecture/single-target/check-architecture.sh'}
 ROBLOX_FILES = {'README.md', 'LICENSE', '.editorconfig', '.gitignore', 'rokit.toml',
                 'default.project.json', 'wally.toml', 'stylua.toml', 'selene.toml', '.luaurc',
                 'src/server/.gitkeep', 'src/client/.gitkeep', 'src/shared/.gitkeep',

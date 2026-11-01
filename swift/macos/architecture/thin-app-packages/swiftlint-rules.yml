@@ -1,0 +1,22 @@
+custom_rules:
+  arch_core_pure_swift:
+    name: Core stays pure Swift
+    included: '.*/Sources/Core/.*\.swift'
+    regex: '\bimport\s+(?:(?:typealias|struct|class|enum|protocol|let|var|func)\s+)?(?:SwiftUI|AppKit|Cocoa|SwiftData|Clients|\w+Feature)\b'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: 'Core must not import SwiftUI/AppKit/Cocoa/SwiftData, Clients or any Feature.'
+    severity: error
+  arch_feature_isolation:
+    name: Features depend only on Core
+    included: '.*/Sources/Features/.*\.swift'
+    regex: '\bimport\s+(?:(?:typealias|struct|class|enum|protocol|let|var|func)\s+)?(?:Clients|\w+Feature)\b'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: 'A Feature must not import another Feature or Clients; the App injects Clients.'
+    severity: error
+  arch_clients_no_features:
+    name: Clients do not know Features
+    included: '.*/Sources/Clients/.*\.swift'
+    regex: '\bimport\s+(?:(?:typealias|struct|class|enum|protocol|let|var|func)\s+)?\w+Feature\b'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: 'Clients implement Core protocols and must not import any Feature.'
+    severity: error

@@ -1,0 +1,26 @@
+// swift-tools-version: 6.0
+// Template for the local package next to the thin Xcode app (e.g. Modules/Package.swift).
+// Rename HomeFeature/SettingsFeature to your features. Keep these layer rules:
+//   Core: no dependencies. Clients and every <Name>Feature: depend only on Core.
+// Only the App target (xcodeproj, @main) imports Features and Clients and wires them.
+// scripts/check-architecture.sh rejects any other local target edge.
+import PackageDescription
+
+let package = Package(
+    name: "AppModules",
+    platforms: [.macOS(.v15)],
+    products: [
+        .library(name: "Core", targets: ["Core"]),
+        .library(name: "Clients", targets: ["Clients"]),
+        .library(name: "HomeFeature", targets: ["HomeFeature"]),
+        .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
+    ],
+    targets: [
+        .target(name: "Core"),
+        .target(name: "Clients", dependencies: ["Core"]),
+        .target(name: "HomeFeature", dependencies: ["Core"], path: "Sources/Features/Home"),
+        .target(name: "SettingsFeature", dependencies: ["Core"], path: "Sources/Features/Settings"),
+        .testTarget(name: "CoreTests", dependencies: ["Core"]),
+    ],
+    swiftLanguageModes: [.v6]
+)

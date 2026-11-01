@@ -1,0 +1,15 @@
+custom_rules:
+  arch_models_no_ui:
+    name: Models stay UI-free
+    included: '.*/Models/.*\.swift'
+    regex: '\bimport\s+(?:(?:typealias|struct|class|enum|protocol|let|var|func)\s+)?(?:SwiftUI|AppKit|Cocoa)\b'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: 'Models must not import SwiftUI/AppKit/Cocoa; Views read Models, not the reverse.'
+    severity: error
+  arch_services_no_ui:
+    name: Services stay UI-free
+    included: '.*/Services/.*\.swift'
+    regex: '\bimport\s+(?:(?:typealias|struct|class|enum|protocol|let|var|func)\s+)?(?:SwiftUI|AppKit|Cocoa)\b'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: 'Services do I/O for Models and must not import SwiftUI/AppKit/Cocoa.'
+    severity: error
