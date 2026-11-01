@@ -18,6 +18,16 @@ python3 -c 'import sys; assert sys.version_info >= (3, 9), "Python >=3.9 require
 [ -n "${NATIVE_APP_DESTINATION:-}" ] || fail 'missing destination'
 case "$NATIVE_APP_DESTINATION" in platform=macOS|platform=macOS,*) ;; *) fail 'requires concrete macOS destination' ;; esac
 export NATIVE_APP_WORK_DIR=${NATIVE_APP_WORK_DIR:-.native-check}
+# Fail closed: a full check without a chosen architecture would silently skip the
+# dependency-direction rules (README アーキテクチャ).
+case "$stage" in
+    all|architecture)
+        case "${NATIVE_APP_ARCHITECTURE:-}" in
+            thin-app-packages|single-target) ;;
+            '') fail 'missing NATIVE_APP_ARCHITECTURE: choose thin-app-packages (default) or single-target per README アーキテクチャ, copy architecture/<option>/check-architecture.sh to scripts/check-architecture.sh, merge architecture/<option>/swiftlint-rules.yml into .swiftlint.yml, and set NATIVE_APP_ARCHITECTURE (thin-app-packages also needs NATIVE_APP_PACKAGE_DIR)' ;;
+            *) fail "unknown architecture: $NATIVE_APP_ARCHITECTURE (thin-app-packages|single-target)" ;;
+        esac ;;
+esac
 python3 - <<'PY'
 import os
 from pathlib import Path
@@ -158,13 +168,7 @@ PY
     esac
 }
 if [ "$stage" = all ]; then
-    for next in format lint architecture settings test build; do
-        if [ "$next" = architecture ] && [ -z "${NATIVE_APP_ARCHITECTURE:-}" ]; then
-            printf '%s\n' 'architecture: not selected (NATIVE_APP_ARCHITECTURE unset)'
-            continue
-        fi
-        run_stage "$next"
-    done
+    for next in format lint architecture settings test build; do run_stage "$next"; done
 else
     # Direct test/build also require effective quality, not just presence of files.
     case "$stage" in test|build) run_stage settings ;; esac

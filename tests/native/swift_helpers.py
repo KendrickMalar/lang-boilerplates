@@ -43,6 +43,9 @@ def swift_env(root: Path) -> dict[str, str]:
         'NATIVE_APP_SOURCE_DIR': 'Sources',
         'NATIVE_APP_DESTINATION': f'platform=macOS,arch={platform.machine()}',
         'NATIVE_APP_VERIFY_UNSIGNED': '1',
+        # Default architecture (README アーキテクチャ); check.sh all fails closed without it.
+        'NATIVE_APP_ARCHITECTURE': 'thin-app-packages',
+        'NATIVE_APP_PACKAGE_DIR': 'Modules',
         'HOME': str(root / 'home'),
         'CFFIXED_USER_HOME': str(root / 'home'),
     }
@@ -80,7 +83,8 @@ def run_swift(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]
     return result
 
 
-def copy_swift_fixture(platform: Literal['macos', 'ios']) -> Path:
+def copy_swift_fixture(platform: Literal['macos', 'ios'],
+                       option: Literal['thin-app-packages', 'single-target'] = 'thin-app-packages') -> Path:
     leaf = ROOT / 'swift' / platform
     if not leaf.is_dir():
         raise RuntimeError(f'{platform} leaf absent; do not borrow sibling settings')
@@ -89,6 +93,7 @@ def copy_swift_fixture(platform: Literal['macos', 'ios']) -> Path:
     shutil.copytree(leaf, root, dirs_exist_ok=True)
     (root / '.native-app-fixture').write_text('approved-isolated-fixture\n')
     make_app_project(root, platform)
+    install_architecture(root, option)
     return root
 
 
@@ -209,6 +214,4 @@ def install_architecture(root: Path, option: Literal['thin-app-packages', 'singl
 
 def copy_architecture_fixture(platform: Literal['macos', 'ios'],
                               option: Literal['thin-app-packages', 'single-target']) -> Path:
-    root = copy_swift_fixture(platform)
-    install_architecture(root, option)
-    return root
+    return copy_swift_fixture(platform, option)

@@ -45,10 +45,8 @@ class ArchitectureCaseBase:
     def run_check(self, stage='architecture', *, success=True, contains=None, env=None):
         values = self.architecture_env()
         values.update(env or {})
-        with patch.dict(os.environ, {k: v for k, v in values.items() if v is not None}):
-            for key, value in values.items():
-                if value is None:
-                    os.environ.pop(key, None)
+        # '' means unset: check.sh treats empty as missing, and swift_env keeps it.
+        with patch.dict(os.environ, {k: '' if v is None else v for k, v in values.items()}):
             result = self.helper.run_swift(['sh', 'scripts/check.sh', stage], self.root)
         output = result.stdout + result.stderr
         if success:
@@ -75,8 +73,16 @@ class ArchitectureCaseBase:
                 path.unlink()
 
     def test_selection_and_rule_presence_required(self):
-        self.run_check(env={'NATIVE_APP_ARCHITECTURE': None}, success=False,
-                       contains='NATIVE_APP_ARCHITECTURE')
+        for stage in ['architecture', 'all']:
+            with self.subTest(stage=stage):
+                output = self.run_check(stage, env={'NATIVE_APP_ARCHITECTURE': None}, success=False,
+                                        contains='missing NATIVE_APP_ARCHITECTURE')
+                self.assertIn('README アーキテクチャ', output)
+                self.assertIn('check-architecture.sh', output)
+                self.assertNotIn('stage: ', output)
+        output = self.run_check('all', env={'NATIVE_APP_ARCHITECTURE': 'tca'}, success=False,
+                                contains='unknown architecture')
+        self.assertNotIn('stage: ', output)
         self.run_check(env={'NATIVE_APP_ARCHITECTURE': 'tca'}, success=False,
                        contains='unknown architecture')
         other = 'single-target' if self.option == 'thin-app-packages' else 'thin-app-packages'

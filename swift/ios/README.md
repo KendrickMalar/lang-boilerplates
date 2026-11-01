@@ -47,8 +47,8 @@ sh scripts/check.sh all
 
 Modes: `format|lint|architecture|settings|test|build|all`. `all` stops at the first failure in
 format(strict) → SwiftLint(strict) → architecture → settings → app test → native build.
-architecture runs only when `NATIVE_APP_ARCHITECTURE` is set (see アーキテクチャ below);
-otherwise `all` prints `architecture: not selected`. Direct `architecture` without it fails.
+`all` and `architecture` require `NATIVE_APP_ARCHITECTURE` (see アーキテクチャ below);
+unset or unknown values fail before any stage runs, so the rules are never silently skipped.
 Project/source paths must resolve inside the copied project root. Missing/empty
 source, missing project/scheme/destination/tool and zero/only-skipped tests fail.
 No `ignore-exit`, lenient syntax or validation bypass is used. Formatter never
@@ -162,7 +162,7 @@ Modules/                      ローカルパッケージ（NATIVE_APP_PACKAGE_D
 2. [architecture/thin-app-packages/swiftlint-rules.yml](architecture/thin-app-packages/swiftlint-rules.yml) を `.swiftlint.yml` の末尾に統合します。既に `custom_rules:` があれば、その下に3つの規則を足します。
 3. [architecture/thin-app-packages/check-architecture.sh](architecture/thin-app-packages/check-architecture.sh) を `scripts/check-architecture.sh` にコピーします。
 4. Xcode で `Modules` をローカルパッケージとして追加し、App ターゲットに Feature と Clients のライブラリをつなぎます。
-5. check の環境（IDE の Git を含む）に `NATIVE_APP_ARCHITECTURE=thin-app-packages` と `NATIVE_APP_PACKAGE_DIR=Modules` を設定します。`sh scripts/check.sh architecture` で単独実行でき、`all` では lint の後・settings の前に走ります。
+5. check の環境（IDE の Git を含む）に `NATIVE_APP_ARCHITECTURE=thin-app-packages` と `NATIVE_APP_PACKAGE_DIR=Modules` を設定します。`sh scripts/check.sh architecture` で単独実行でき、`all` では lint の後・settings の前に走ります。未設定のまま `all` を流すと、選び方と設定手順を示して非0で止まります。
 
 検査の中身: `.swiftlint.yml` に3規則があること、パッケージの swift-format と SwiftLint（SOURCE_DIR の外でも検査）、`swift package dump-package` による宣言済み依存の向き、毎回新しいビルド先（`.native-check/run-*/architecture-build`）での、パッケージの scheme（`<名前>-Package`）の `xcodebuild build-for-testing`（`generic/platform=iOS Simulator`。Simulator は起動しません）。iOS 専用パッケージは macOS で `swift build` できないためです。未宣言ターゲットの import は差分ビルドだと通ることがあるため、DerivedData を再利用しません。SwiftUI などのシステムフレームワークはターゲット依存では止まらないので、SwiftLint の規則で止めます。Xcode アプリにつないだ場合も、差分ビルドでは通り、新しい DerivedData では失敗することを確かめています。xcodebuild はパッケージに `.swiftpm/` を作ることがあります（Xcode でパッケージを開いたときと同じ）。
 
@@ -201,7 +201,7 @@ Sources/AppTests/
 
 1. [architecture/single-target/swiftlint-rules.yml](architecture/single-target/swiftlint-rules.yml) を `.swiftlint.yml` の末尾に統合します。既に `custom_rules:` があれば、その下に2つの規則を足します。
 2. [architecture/single-target/check-architecture.sh](architecture/single-target/check-architecture.sh) を `scripts/check-architecture.sh` にコピーします。
-3. check の環境に `NATIVE_APP_ARCHITECTURE=single-target` を設定します。
+3. check の環境（IDE の Git を含む）に `NATIVE_APP_ARCHITECTURE=single-target` を設定します。未設定のままでは `all` が非0で止まります。
 
 lint 段階でも同じ規則が効きます。architecture 段階は規則が `.swiftlint.yml` から消えていないことを確かめ、2規則だけで SOURCE_DIR を検査します。
 

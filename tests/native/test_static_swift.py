@@ -127,6 +127,8 @@ class StaticSwiftArchitectureTests(unittest.TestCase):
                 self.assertIn('format|lint|architecture|settings|test|build|all', check)
                 self.assertIn('for next in format lint architecture settings test build', check)
                 self.assertIn('NATIVE_APP_ARCHITECTURE', check)
+                self.assertNotIn('not selected', check)
+                self.assertIn('missing NATIVE_APP_ARCHITECTURE', check)
 
 
 if __name__ == '__main__':
