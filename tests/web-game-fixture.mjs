@@ -2,8 +2,8 @@ import { join } from "node:path";
 import { ROOT, copyPreset, write, runAt } from "./helpers.mjs";
 
 // Verification-only game. None of these sources belong to the copyable preset.
-export async function createGame3dFixture() {
-  const root = await copyPreset("web-game-3d", { sample: false });
+export async function createWebGameFixture() {
+  const root = await copyPreset("web-game", { sample: false });
   await write(
     root,
     "index.html",

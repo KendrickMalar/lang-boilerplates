@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { ROOT } from "./helpers.mjs";
 
 test("each leaf includes its own complete safe TypeScript configuration", () => {
-  for (const name of ["node", "web", "library", "web-game-3d"]) {
+  for (const name of ["cli", "web", "ts-library", "web-game"]) {
     const dir = join(ROOT, "typescript", name);
     assert.ok(existsSync(dir), "missing standalone template: " + name);
     for (const file of [
@@ -51,7 +51,7 @@ test("each leaf includes its own complete safe TypeScript configuration", () => 
     assert.equal(manifest.private, true);
     assert.equal(
       manifest.scripts.check,
-      name === "web-game-3d"
+      name === "web-game"
         ? "pnpm typecheck && pnpm lint && pnpm lint:duplicates && pnpm lint:similarity && pnpm format:check && pnpm test && pnpm test:e2e:preview"
         : "pnpm typecheck && pnpm lint && pnpm lint:duplicates && pnpm lint:similarity && pnpm format:check && pnpm test && pnpm build",
     );
@@ -73,7 +73,7 @@ test("each leaf includes its own complete safe TypeScript configuration", () => 
   }
 });
 test("each leaf enforces 90% Vitest coverage over all of src", () => {
-  for (const name of ["node", "web", "library", "web-game-3d"]) {
+  for (const name of ["cli", "web", "ts-library", "web-game"]) {
     const dir = join(ROOT, "typescript", name);
     const manifest = JSON.parse(
       readFileSync(join(dir, "package.json"), "utf8"),
@@ -103,9 +103,9 @@ test("each leaf enforces 90% Vitest coverage over all of src", () => {
 test("TypeScript root contains only the language entry and standalone directories", () => {
   assert.deepEqual(readdirSync(join(ROOT, "typescript")).sort(), [
     "README.md",
-    "library",
-    "node",
+    "cli",
+    "ts-library",
     "web",
-    "web-game-3d",
+    "web-game",
   ]);
 });

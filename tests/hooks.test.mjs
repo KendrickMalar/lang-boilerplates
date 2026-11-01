@@ -35,7 +35,7 @@ async function prepare(root) {
 }
 test("real commit hook rejects unsafe code and preserves HEAD", async () => {
   const baseline = await snapshot();
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   await prepare(root);
   const before = git(root, ["rev-parse", "HEAD"]);
   await write(root, "src/unsafe.ts", "Promise.resolve(1);\nexport {};\n");
@@ -49,7 +49,7 @@ test("real commit hook rejects unsafe code and preserves HEAD", async () => {
 });
 test("real push hook accepts valid code then rejects type errors without updating remote", async () => {
   const baseline = await snapshot();
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   await prepare(root);
   const remote = await mkdtemp(join(ROOT, ".verification/fixtures", "remote-"));
   git(remote, ["init", "--bare"]);
@@ -70,7 +70,7 @@ test("real push hook accepts valid code then rejects type errors without updatin
 });
 test("dependency install preserves pre-existing hooks and global hooks", async () => {
   const baseline = await snapshot();
-  const root = await copyPreset("node", { dependencies: false, sample: false });
+  const root = await copyPreset("cli", { dependencies: false, sample: false });
   git(root, ["init", "-b", "main"]);
   await write(root, ".existing-hooks/pre-commit", "#!/bin/sh\nexit 0\n");
   git(root, ["config", "core.hooksPath", ".existing-hooks"]);

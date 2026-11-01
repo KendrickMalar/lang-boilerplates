@@ -5,12 +5,12 @@
 
 ## 用途を選ぶ
 
-| 用途              | 設定・導入手順                                   |
-| ----------------- | ------------------------------------------------ |
-| Nodeアプリ／CLI   | [node/README.md](./node/README.md)               |
-| ブラウザの汎用Web | [web/README.md](./web/README.md)                 |
-| ブラウザ3Dゲーム  | [web-game-3d/README.md](./web-game-3d/README.md) |
-| npmライブラリ     | [library/README.md](./library/README.md)         |
+| 用途                     | 設定・導入手順                                 |
+| ------------------------ | ---------------------------------------------- |
+| CLI／Nodeアプリ          | [cli/README.md](./cli/README.md)               |
+| ブラウザの汎用Web        | [web/README.md](./web/README.md)               |
+| ブラウザゲーム（2D・3D） | [web-game/README.md](./web-game/README.md)     |
+| npmライブラリ            | [ts-library/README.md](./ts-library/README.md) |
 
 各ディレクトリは自己完結しています。選んだ1つのディレクトリに必要な設定・Gitフック・README・MITライセンスが揃っており、親や兄弟ディレクトリの設定ファイルをコピーする必要はありません。
 

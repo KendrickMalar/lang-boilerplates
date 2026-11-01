@@ -4,9 +4,9 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "./helpers.mjs";
 
-const dir = join(ROOT, "typescript/web-game-3d");
-test("3D preset is independently copyable without product sources", () => {
-  assert.ok(existsSync(dir), "missing standalone 3D preset");
+const dir = join(ROOT, "typescript/web-game");
+test("web-game preset is independently copyable without product sources", () => {
+  assert.ok(existsSync(dir), "missing standalone web-game preset");
   for (const file of [
     "package.json",
     "tsconfig.e2e.json",

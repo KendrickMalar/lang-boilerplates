@@ -3,14 +3,14 @@ import assert from "node:assert/strict";
 import { cp, mkdir, readFile, rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { ROOT, write, expectResult } from "./helpers.mjs";
-import { createGame3dFixture, browserEnv } from "./game3d-fixture.mjs";
+import { createWebGameFixture, browserEnv } from "./web-game-fixture.mjs";
 
 // Removing WASM support, browser type boundaries or E2E from check must break this.
 test(
-  "3D preset runs from an isolated copy and fails closed",
+  "web-game preset runs a 3D game from an isolated copy and fails closed",
   { timeout: 1_200_000 },
   async (t) => {
-    const root = await createGame3dFixture();
+    const root = await createWebGameFixture();
     const run = (args, status = 0, diagnostic) =>
       expectResult(root, args, status, diagnostic, browserEnv);
     const product = await readFile(join(root, "src/index.ts"), "utf8");

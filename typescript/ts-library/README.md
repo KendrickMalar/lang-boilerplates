@@ -1,6 +1,6 @@
-# TypeScript Node／CLI Boilerplate
+# TypeScript npmライブラリ Boilerplate
 
-Nodeアプリ／CLI向けの設定一式です。NodeNextで解決し、製品srcだけをdistへ出力します。DOM型は含めません。開発時は`pnpm dev`でtsxを使います。CLIのentryが決まった後にbinと実行権限を別途設定してください。
+npmライブラリ向けの設定一式です。ESMのJSと型定義をdistへ出力します。ルートtestsとsrc内の`*.test.ts`・`*.spec.ts`・`__tests__/`をテスト対象とし、ビルドから除外します。初期設定は誤公開防止のため`private: true`です。公開前にname、version、license、repository、private、exports、配布内容を確認し、公開許可を別途得てください。自動publishは行いません。
 
 このディレクトリだけで設定が完結します。以下のパスは**このREADMEからの相対パス**です。親・兄弟の設定ファイルには依存しません。pnpm 12.6.0、Node 24.15以上の24系またはNode26以上（Node25は対象外）、ESMが前提です。
 
@@ -29,6 +29,7 @@ Nodeアプリ／CLI向けの設定一式です。NodeNextで解決し、製品sr
 | [pnpm-workspace.yaml](./pnpm-workspace.yaml)       | `pnpm-workspace.yaml`                    |
 | [vitest.config.ts](./vitest.config.ts)             | `vitest.config.ts`                       |
 | [tsconfig.build.json](./tsconfig.build.json)       | `tsconfig.build.json`                    |
+| [clean-dist.mjs](./clean-dist.mjs)                 | `clean-dist.mjs`                         |
 | [.husky/pre-commit](./.husky/pre-commit)           | `.husky/pre-commit`                      |
 | [.husky/pre-push](./.husky/pre-push)               | `.husky/pre-push`                        |
 | [LICENSE](./LICENSE)                               | `LICENSE.lang-boilerplates`              |
@@ -36,6 +37,8 @@ Nodeアプリ／CLI向けの設定一式です。NodeNextで解決し、製品sr
 設定はMITです。ライセンス文・著作権表示を保持してください。LICENSEは既存ライセンスを上書きしないよう、例えばLICENSE.lang-boilerplatesとして保存します。利用プロジェクト自身のライセンスを自動変更しません。
 
 製品コード・サンプルテスト・HTMLは配布しません。利用側でsrcとtests/**/*.test.tsを用意してください。設定だけをコピーした状態やテストなしを検証合格にしません。フレームワーク生成済みなら既存設定を優先し、差分を確認します。
+
+**libraryのbuildは生成物専用distを削除してから再生成します。** 初回build前に既存distの由来と内容を確認し、生成物専用と確認できない場合は停止して相談してください。distに手書きファイルを置かないでください。clean-dist.mjsと実行rootが一致しない場合、distがsymlinkまたは通常ディレクトリ以外の場合は、削除せず停止します。src・テスト・ログは削除対象ではありません。
 
 ## 2. package.jsonと依存を整える
 
@@ -80,7 +83,7 @@ pnpm install --ignore-scripts --engine-strict
 - Vitestの推奨検査を実行対象のテストに適用し、focused test（.only）・disabled test（.skip等）をerrorにします。.onlyをLintの--fixで勝手に除去する設定にはしません。テストのunsafe検査を一括offにはしません。
 - 正規表現は推奨ルールで、重複した選択肢・誤用・不必要な記述等を検査します。
 - Nodeで実行するコードは、対象プロジェクトのpackage.jsonのengines.nodeに基づく静的Node API検査を行います。実験的APIは明示的な採用判断なしに許可しません。この検査はpluginの対応表で分かる静的APIに限られ、instance method・追加引数・全optionsの互換性を保証するものではありません。
-- アプリ内部の関数すべてに明示的な戻り値型を強制する設定にはしていません。
+- libraryの製品srcにはexplicit-module-boundary-typesを適用し、公開関数・メソッドの引数/戻り値の型を明示します。実行対象の併置テストはこの公開APIルールから除外します。
 
 固定plugin版は`@vitest/eslint-plugin 1.6.27`、`eslint-plugin-n 18.4.1`、`eslint-plugin-regexp 3.3.1`です。ルール強化により、以前通っていたコードが不合格になる場合があります。エラーの理由を確認して修正し、検査を一括offにして回避しません。
 
@@ -155,7 +158,7 @@ done
 
 ### commit前・push前の検査と確認
 
-commit前は`node check-commit.mjs`が**pnpm check全体**を実行します。型→Lint→重複→類似度→書式→単体テスト→ビルドを検査し、3D用途は本番ビルド＋ブラウザE2Eも含みます。3D用途ではcommit時にもブラウザ導入済みの環境とPLAYWRIGHT_BROWSERS_PATHが必要です。push前にもpnpm checkを再実行します。
+commit前は`node check-commit.mjs`が**pnpm check全体**を実行します。型→Lint→重複→類似度→書式→単体テスト→ビルドを検査し、ブラウザゲーム用途（web-game）は本番ビルド＋ブラウザE2Eも含みます。web-gameではcommit時にもブラウザ導入済みの環境とPLAYWRIGHT_BROWSERS_PATHが必要です。push前にもpnpm checkを再実行します。
 
 検査した内容とcommit内容を揃えるため、未ステージの追跡ファイル変更と、ignoreされていない未追跡ファイルがあれば停止します。必要なファイルを先にstageし、不要なファイルは内容を確認して明示的にignoreします。自動stash・自動整形・自動stageはしません。`lint-staged.config.mjs`は任意の手動実行用でありcommitゲートには使いません。検査中に作業内容やindexが変わった場合も停止します。検査中は並行編集・stageを行わないでください。
 `assume-unchanged`・`skip-worktree`の付いたindexでは作業内容の不一致が隠れるため、commitゲートはそれらのフラグを検出して停止します。sparse checkoutもこのゲートでは未対応です。設定を勝手に解除せず、必要性を確認して利用側で明示的に整理します。

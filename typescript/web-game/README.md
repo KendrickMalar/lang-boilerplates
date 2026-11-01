@@ -1,6 +1,14 @@
-# TypeScript Web 3D Game Boilerplate
+# TypeScript Web Game Boilerplate（2D・3D）
 
-ブラウザ3Dゲームの試作向けに、Three.js＋Rapier、Vite、単体テスト、実ブラウザ検査を組み合わせた設定です。Roblox互換エンジンではありません。描画・入力・カメラ・ゲームループ・テスト本体・HTMLは利用側で実装します。Reactは必須にしません。
+ブラウザゲーム（2D・3D）の試作向けに、Vite、単体テスト、実ブラウザ検査を組み合わせた設定です。3D のときだけ Three.js＋Rapier を使います。Roblox互換エンジンではありません。描画・入力・カメラ・ゲームループ・テスト本体・HTMLは利用側で実装します。Reactは必須にしません。
+
+| 項目                                       | 2D                                         | 3D                 |
+| ------------------------------------------ | ------------------------------------------ | ------------------ |
+| Vite・型検査・Lint・単体テスト・カバレッジ | 使う                                       | 使う               |
+| Playwright のブラウザ試験（`pnpm check`）  | 使う                                       | 使う               |
+| Three.js・@types/three                     | 外す（2 節）                               | 使う               |
+| Rapier（@dimforge/rapier3d-compat）        | 外す（2 節）                               | 使う               |
+| WebGL・WASM 初期化の判定                   | WebGL の描画ライブラリを使うときだけ WebGL | 両方を判定（4 節） |
 
 このディレクトリだけで完結します。親・兄弟の設定へ依存しません。Node 24.15以上の24系またはNode26以上（Node25は対象外）、pnpm 12.6.0、ESMを前提にします。
 
@@ -43,7 +51,9 @@
 
 ## 2. 依存とブラウザの導入
 
-依存はThree.js 0.186.1、@types/three 0.186.0、@dimforge/rapier3d-compat 0.21.0、Playwright 1.64.1、eslint-plugin-playwright 2.12.1で固定しています。共通検査はTypeScript 6.0.3、Vite 8.3.4、Vitest 5.0.3、typescript-eslint 8.71.1等です。Three.jsと型定義は対応するリリース系列を揃えます。
+依存はPlaywright 1.64.1、eslint-plugin-playwright 2.12.1で固定しています。共通検査はTypeScript 6.0.3、Vite 8.3.4、Vitest 5.0.3、typescript-eslint 8.71.1等です。
+
+3D のときだけ使う依存は、Three.js 0.186.1、@types/three 0.186.0、@dimforge/rapier3d-compat 0.21.0 です。Three.jsと型定義は対応するリリース系列を揃えます。2D のときは、コピーした package.json の `dependencies` から `three` と `@dimforge/rapier3d-compat` を、`devDependencies` から `@types/three` を外してから install します。ほかの設定ファイルはこれらを参照していないので、そのまま使えます。2D の描画ライブラリ（PixiJS など）は同梱しません。Canvas 2D API は追加の依存なしで使えます。描画ライブラリを足すときは版を固定し、利用側で選びます。
 
 対象・保存先・ダウンロードの許可を確認し、プロジェクトルートで実行します。
 
@@ -64,7 +74,7 @@ pnpmの依存安全設定（検証時の自動install禁止、公開24時間未�
 - `tests/e2e/**/*.spec.ts`：Playwrightのブラウザ試験。Node側のテストコードなので、DOM操作はlocator等を使います。ブラウザ側ヘルパーはsrc側に置き、Node側テストにdocument/windowを直書きしません。
 - Vite設定・Playwright設定はNode型のみ。単体とE2Eは別の型プロジェクト・別runnerで、相互に実行しません。
 
-Rapier互換版はWASMをJSへ同梱するため、外部CDNやWASM配信プラグインを必須にしません。`await RAPIER.init()`が成功してからWorldを作ります。初期化失敗を握り潰さず、ゲームループを開始しません。Three.jsは描画、Rapierは物理です。固定時間刻み、描画位置の同期、入力、カメラは利用側の責務です。Three.jsの時間管理は非推奨のClockではなくTimer等を使います。
+以下は 3D のときだけ当てはまります。Rapier互換版はWASMをJSへ同梱するため、外部CDNやWASM配信プラグインを必須にしません。`await RAPIER.init()`が成功してからWorldを作ります。初期化失敗を握り潰さず、ゲームループを開始しません。Three.jsは描画、Rapierは物理です。固定時間刻み、描画位置の同期、入力、カメラは利用側の責務です。Three.jsの時間管理は非推奨のClockではなくTimer等を使います。
 
 ## 4. 検査コマンド
 
@@ -99,9 +109,9 @@ Playwrightが127.0.0.1:4173（開発）または4174（preview）を起動・終
 
 ### ブラウザ試験で必ず判定すること
 
-PlaywrightはpageerrorやHTTP失敗を自動で不合格にしません。利用側のE2Eで、ページを開く前にpageerror・console error・requestfailed・HTTP 400以上を収集し、終わりに0件をassertしてください。WASM初期化完了、実際の描画、入力後の状態変化、resizeも期待結果までassertします。単にページが開いたことやcanvasが存在することだけでは合格にしません。
+PlaywrightはpageerrorやHTTP失敗を自動で不合格にしません。利用側のE2Eで、ページを開く前にpageerror・console error・requestfailed・HTTP 400以上を収集し、終わりに0件をassertしてください。実際の描画、入力後の状態変化、resizeも期待結果までassertします（2D・3D 共通）。3D のときは WASM初期化完了も assert します。単にページが開いたことやcanvasが存在することだけでは合格にしません。
 
-WebGLを使えるChromium実行環境が必要です。描画不可・初期化失敗をskipしたり、モックのRendererやNullEngineへ切り替えて合格にしません。trace・失敗時画像は`test-results/`へ出ます。必要な成功時画像もテストで保存します。ソフトウェア描画やエミュレーターの結果を実GPU・スマホ実機の性能と扱いません。
+3D（と、WebGL で描く 2D ライブラリ）では、WebGLを使えるChromium実行環境が必要です。Canvas 2D API だけの 2D では WebGL は要りません。描画不可・初期化失敗をskipしたり、モックのRendererやNullEngineへ切り替えて合格にしません。trace・失敗時画像は`test-results/`へ出ます。必要な成功時画像もテストで保存します。ソフトウェア描画やエミュレーターの結果を実GPU・スマホ実機の性能と扱いません。
 
 ### similarity-tsの導入（明示実行）
 
@@ -167,7 +177,7 @@ done
 
 ### commit前・push前の検査と確認
 
-commit前は`node check-commit.mjs`が**pnpm check全体**を実行します。型→Lint→重複→類似度→書式→単体テスト→ビルドを検査し、3D用途は本番ビルド＋ブラウザE2Eも含みます。3D用途ではcommit時にもブラウザ導入済みの環境とPLAYWRIGHT_BROWSERS_PATHが必要です。push前にもpnpm checkを再実行します。
+commit前は`node check-commit.mjs`が**pnpm check全体**を実行します。型→Lint→重複→類似度→書式→単体テスト→ビルドを検査し、ブラウザゲーム用途（web-game）は本番ビルド＋ブラウザE2Eも含みます。web-gameではcommit時にもブラウザ導入済みの環境とPLAYWRIGHT_BROWSERS_PATHが必要です。push前にもpnpm checkを再実行します。
 
 検査した内容とcommit内容を揃えるため、未ステージの追跡ファイル変更と、ignoreされていない未追跡ファイルがあれば停止します。必要なファイルを先にstageし、不要なファイルは内容を確認して明示的にignoreします。自動stash・自動整形・自動stageはしません。`lint-staged.config.mjs`は任意の手動実行用でありcommitゲートには使いません。検査中に作業内容やindexが変わった場合も停止します。検査中は並行編集・stageを行わないでください。
 `assume-unchanged`・`skip-worktree`の付いたindexでは作業内容の不一致が隠れるため、commitゲートはそれらのフラグを検出して停止します。sparse checkoutもこのゲートでは未対応です。設定を勝手に解除せず、必要性を確認して利用側で明示的に整理します。
@@ -178,7 +188,7 @@ Huskyと直接Git hooksはどちらもローカル検査です。未導入端末
 
 ## 6. 境界と検証範囲
 
-この設定の保守試験は、配布ディレクトリだけを隔離先へコピーし、そこで生成した使い捨てゲームを検査します。実WebGLの画素、Rapierの落下・接触、キー入力、resizeを開発と本番previewで確認し、実行時エラー・HTTP失敗・WASM初期化失敗・テスト0件・型不正が非0になることを検査します。検証用ゲームは配布物ではありません。
+この設定の保守試験は、配布ディレクトリだけを隔離先へコピーし、そこで生成した使い捨ての 3D ゲームを検査します。実WebGLの画素、Rapierの落下・接触、キー入力、resizeを開発と本番previewで確認し、実行時エラー・HTTP失敗・WASM初期化失敗・テスト0件・型不正が非0になることを検査します。検証用ゲームは配布物ではありません。2D の構成（Three.js・Rapier を外した状態）は、保守試験では検証していません。
 
 Roblox本実装との仕様・データ・シード・シナリオの整合はゲーム側で検査します。ブラウザの合格はRobloxの物理・通信・Humanoid・保存・購入・公開品質の合格ではありません。Roblox風の敵リグ・カメラ・演出やAI試遊ランナーの実装も、この設定には含みません。
 

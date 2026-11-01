@@ -6,7 +6,7 @@ import { ROOT } from "./helpers.mjs";
 
 test("language entry links to all standalone README files", () => {
   const entry = readFileSync(join(ROOT, "typescript/README.md"), "utf8");
-  for (const name of ["node", "web", "library", "web-game-3d"]) {
+  for (const name of ["cli", "web", "ts-library", "web-game"]) {
     assert.ok(
       entry.includes("./" + name + "/README.md"),
       "missing language entry: " + name,
@@ -14,7 +14,7 @@ test("language entry links to all standalone README files", () => {
   }
 });
 test("each leaf README describes only its own complete distribution", () => {
-  for (const name of ["node", "web", "library", "web-game-3d"]) {
+  for (const name of ["cli", "web", "ts-library", "web-game"]) {
     const dir = join(ROOT, "typescript", name);
     const text = readFileSync(join(dir, "README.md"), "utf8");
     const targets = [...text.matchAll(/\]\(([^\s)#]+)\)/g)]

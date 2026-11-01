@@ -7,7 +7,7 @@ const THRESHOLD_MISS =
 const UNTESTED =
   "export function untested(value: number): number {\n  return value > 0 ? value * 2 : -value;\n}\n";
 
-for (const name of ["library", "node", "web", "web-game-3d"]) {
+for (const name of ["ts-library", "cli", "web", "web-game"]) {
   test(name + " rejects src files that tests never import", async () => {
     const root = await copyPreset(name);
     await expectResult(root, ["test"], 0);
@@ -17,7 +17,7 @@ for (const name of ["library", "node", "web", "web-game-3d"]) {
 }
 
 test("untested JavaScript files under src also count", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   await write(
     root,
     "src/util.js",
@@ -27,7 +27,7 @@ test("untested JavaScript files under src also count", async () => {
 });
 
 test("colocated tests under src are not counted as product code", async () => {
-  const root = await copyPreset("library");
+  const root = await copyPreset("ts-library");
   await write(
     root,
     "src/index.test.ts",
@@ -39,7 +39,7 @@ test("colocated tests under src are not counted as product code", async () => {
 });
 
 test("commit gate rejects a staged change that drops coverage below 90%", async () => {
-  const root = await copyPreset("library");
+  const root = await copyPreset("ts-library");
   const git = (...args) => {
     const result = runAt(root, "git", args);
     assert.equal(result.status, 0, result.output);

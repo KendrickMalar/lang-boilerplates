@@ -16,7 +16,7 @@ const second = first
   .replaceAll("input", "value")
   .replaceAll("result", "output");
 
-for (const preset of ["node", "web", "library", "web-game-3d"]) {
+for (const preset of ["cli", "web", "ts-library", "web-game"]) {
   test(
     preset + " detects renamed structural clones beyond token duplication",
     async () => {
@@ -39,7 +39,7 @@ for (const preset of ["node", "web", "library", "web-game-3d"]) {
 }
 
 test("similarity refuses missing binary, wrong version, no sources and parser errors", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   const binary = join(root, ".tools/similarity/similarity-ts");
   await rename(binary, binary + ".saved");
   let result = runAt(root, "pnpm", ["lint:similarity"]);
@@ -77,7 +77,7 @@ test("similarity refuses missing binary, wrong version, no sources and parser er
 });
 
 test("quality scanners reject a symlinked src directory rather than scanning outside it", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   await rename(join(root, "src"), join(root, "original-src"));
   await symlink("original-src", join(root, "src"), "dir");
   for (const command of ["lint:duplicates", "lint:similarity"]) {

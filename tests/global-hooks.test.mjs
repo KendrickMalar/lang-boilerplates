@@ -3,15 +3,15 @@ import assert from "node:assert/strict";
 import { chmod, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { ROOT, copyPreset, write, runAt } from "./helpers.mjs";
-import { createGame3dFixture, browserEnv } from "./game3d-fixture.mjs";
+import { createWebGameFixture, browserEnv } from "./web-game-fixture.mjs";
 
-for (const preset of ["node", "web", "library", "web-game-3d"]) {
+for (const preset of ["cli", "web", "ts-library", "web-game"]) {
   test(
     preset + " README activates existing global chain without changing it",
     async () => {
       const root =
-        preset === "web-game-3d"
-          ? await createGame3dFixture()
+        preset === "web-game"
+          ? await createWebGameFixture()
           : await copyPreset(preset);
       const globalConfig = join(dirname(root), "global.gitconfig");
       const globalHooks = join(dirname(root), "global-hooks");
@@ -70,7 +70,7 @@ for (const preset of ["node", "web", "library", "web-game-3d"]) {
       git("init", "--bare", remote);
       git("remote", "add", "origin", remote);
       git("push", "origin", "HEAD:main");
-      if (preset === "node") {
+      if (preset === "cli") {
         const child = join(dirname(root), "linked-worktree");
         git("worktree", "add", "-b", "linked-fixture", child, "HEAD");
         const installed = runAt(

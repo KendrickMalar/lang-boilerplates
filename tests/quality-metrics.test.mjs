@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { ESLint } from "eslint";
 import { copyPreset, write, runAt } from "./helpers.mjs";
 
-const presets = ["node", "web", "library", "web-game-3d"];
+const presets = ["cli", "web", "ts-library", "web-game"];
 const complexity = (branches) =>
   "export function score(value: number): number {\nlet result = value;\n" +
   Array.from(
@@ -102,7 +102,7 @@ for (const preset of presets) {
 }
 
 test("duplication checks do not silently skip product files above one MiB", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   const source =
     "/*" +
     "padding".repeat(160000) +
@@ -124,7 +124,7 @@ for (const extension of ["mts", "cts"]) {
   test(
     "duplication checks include ." + extension + " product modules",
     async () => {
-      const root = await copyPreset("node");
+      const root = await copyPreset("cli");
       const source =
         "export function calculate(value: number): number {\n" +
         Array.from(

@@ -4,7 +4,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { copyPreset, write, runAt, expectResult, saveLog } from "./helpers.mjs";
 
-for (const preset of ["node", "web", "library"]) {
+for (const preset of ["cli", "web", "ts-library"]) {
   test(preset + " rejects non-null assertions", async () => {
     const root = await copyPreset(preset);
     await write(root, "src/assertion.ts", "export const first = [1][0]!;\n");
@@ -20,7 +20,7 @@ for (const preset of ["node", "web", "library"]) {
   );
 }
 test("type-only imports must use import type", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   await write(
     root,
     "src/person.ts",
@@ -34,7 +34,7 @@ test("type-only imports must use import type", async () => {
   await expectResult(root, ["lint"], 1, /consistent-type-imports/);
 });
 test("unused disable directives are errors rather than warnings", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   await write(
     root,
     "src/unused-disable.ts",
@@ -59,7 +59,7 @@ for (const [modifier, rule] of [
   ["skip", "no-disabled-tests"],
 ]) {
   test("Vitest rejects " + modifier + " tests", async () => {
-    const root = await copyPreset("node");
+    const root = await copyPreset("cli");
     await write(
       root,
       "tests/selection.test.ts",
@@ -71,7 +71,7 @@ for (const [modifier, rule] of [
   });
 }
 test("library public functions require return types", async () => {
-  const root = await copyPreset("library");
+  const root = await copyPreset("ts-library");
   await write(
     root,
     "src/public.ts",
@@ -80,7 +80,7 @@ test("library public functions require return types", async () => {
   await expectResult(root, ["lint"], 1, /explicit-module-boundary-types/);
 });
 test("Node application functions can keep inferred return types", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   await write(
     root,
     "src/public.ts",
@@ -89,7 +89,7 @@ test("Node application functions can keep inferred return types", async () => {
   await expectResult(root, ["lint"], 0);
 });
 test("Node API compatibility follows the consuming package engines", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   const path = join(root, "package.json");
   const pkg = JSON.parse(await readFile(path, "utf8"));
   pkg.engines.node = ">=10";
@@ -107,7 +107,7 @@ test("Node API compatibility follows the consuming package engines", async () =>
   );
 });
 test("Node static experimental APIs require an explicit policy decision", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   await write(
     root,
     "src/experimental.ts",
@@ -122,7 +122,7 @@ test("Node static experimental APIs require an explicit policy decision", async 
 });
 
 test("stylistic typed rules reject inconsistent array syntax", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   await write(
     root,
     "src/array.ts",
@@ -130,11 +130,11 @@ test("stylistic typed rules reject inconsistent array syntax", async () => {
   );
   await expectResult(root, ["lint"], 1, /array-type/);
 });
-for (const preset of ["web", "library"]) {
+for (const preset of ["web", "ts-library"]) {
   test(preset + " also rejects focused Vitest tests", async () => {
     const root = await copyPreset(preset);
     const path =
-      preset === "library" ? "src/focused.test.ts" : "tests/focused.test.ts";
+      preset === "ts-library" ? "src/focused.test.ts" : "tests/focused.test.ts";
     await write(
       root,
       path,
@@ -153,7 +153,7 @@ test("Vitest rejects standalone expect assertions", async () => {
   await expectResult(root, ["lint"], 1, /vitest\/no-standalone-expect/);
 });
 test("library test helpers are not forced to declare public API return types", async () => {
-  const root = await copyPreset("library");
+  const root = await copyPreset("ts-library");
   await write(
     root,
     "src/internal.test.ts",
@@ -178,7 +178,7 @@ test("browser sources are not classified as Node API targets", async () => {
 });
 
 test("focused tests remain unchanged when lint is invoked with --fix", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   const source =
     'import { expect, test } from "vitest";\ntest.only("focused", () => { expect(1).toBe(1); });\n';
   await write(root, "tests/no-auto-fix.test.ts", source);
