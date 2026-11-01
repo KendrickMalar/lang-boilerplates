@@ -1,0 +1,8 @@
+# parts/: shared building blocks used by models. parts must not depend on models.
+extend = "../pyproject.toml"
+
+[lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[lint.flake8-tidy-imports.banned-api]
+"models".msg = "parts/ must not import models/; dependencies point from models to parts"

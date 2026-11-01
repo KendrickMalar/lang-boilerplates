@@ -1,0 +1,50 @@
+{
+	"schema": 1,
+	"architecture": "ecs",
+	"sourceRoot": "src",
+	"packages": { "path": "Packages", "instance": ["ReplicatedStorage", "Packages"] },
+	"layers": [
+		{
+			"name": "components",
+			"path": "src/shared/components",
+			"mayRequire": ["components", "packages"],
+			"acyclic": true,
+			"forbiddenServices": ["ServerScriptService", "ServerStorage", "DataStoreService", "MemoryStoreService", "MessagingService"]
+		},
+		{
+			"name": "shared",
+			"path": "src/shared",
+			"mayRequire": ["shared", "components", "packages"],
+			"acyclic": true,
+			"forbiddenServices": ["ServerScriptService", "ServerStorage", "DataStoreService", "MemoryStoreService", "MessagingService"]
+		},
+		{
+			"name": "server-systems",
+			"path": "src/server/systems",
+			"mayRequire": ["shared", "components", "packages"]
+		},
+		{
+			"name": "server",
+			"path": "src/server",
+			"mayRequire": ["shared", "components", "server-systems", "packages"],
+			"modules": false
+		},
+		{
+			"name": "client-systems",
+			"path": "src/client/systems",
+			"mayRequire": ["shared", "components", "packages"],
+			"forbiddenServices": ["ServerScriptService", "ServerStorage", "DataStoreService", "MemoryStoreService", "MessagingService"]
+		},
+		{
+			"name": "client",
+			"path": "src/client",
+			"mayRequire": ["shared", "components", "client-systems", "packages"],
+			"modules": false,
+			"forbiddenServices": ["ServerScriptService", "ServerStorage", "DataStoreService", "MemoryStoreService", "MessagingService"]
+		}
+	],
+	"bootScripts": [
+		{ "path": "src/server", "kind": "server", "max": 1 },
+		{ "path": "src/client", "kind": "client", "max": 1 }
+	]
+}
