@@ -1,7 +1,8 @@
 # Godot（GDScript）設定
 
 - [モバイルゲームの品質設定](mobile-game/README.md): Godot 4.7.2・gdtoolkit 4.5.0。型付き GDScript を
-  強制し、ヘッドレスで検査とテストを行うモバイルゲーム用です。
+  強制し、ヘッドレスで検査とテストを行うモバイルゲーム用です。アーキテクチャは「シーンの組み合わせ＋純粋な core」
+  （既定）と「機能ごとのフォルダ」から選び、層の依存の向きを検査します。
 
 3D モデルをコードで作る場合は [Blender Python の設定](../blender/README.md) と組で使います。
 各 leaf は自己完結し、製品 source・生成物は配布しません。macOS（asuka）で手動確認済みで、

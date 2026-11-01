@@ -5,8 +5,8 @@ fail() { printf '%s\n' "error: $*" >&2; exit 1; }
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 stage=${1:-all}
-[ "$#" -le 1 ] || fail 'usage: check.sh [format|lint|typecheck|test|build|similarity|all]'
-case "$stage" in format|lint|typecheck|test|build|similarity|all) ;; *) fail "unknown stage: $stage" ;; esac
+[ "$#" -le 1 ] || fail 'usage: check.sh [format|lint|architecture|typecheck|test|build|similarity|all]'
+case "$stage" in format|lint|architecture|typecheck|test|build|similarity|all) ;; *) fail "unknown stage: $stage" ;; esac
 DEFS_URL='https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/1.69.0/scripts/globalTypes.d.luau'
 DEFS_SHA256='7db9cd4fe55a4d26f3f7d5a39b6279a376f95a6c055c71d5591c26a1d525aaf2'
 DEFS=.luau-lsp-cache/globalTypes-1.69.0.d.luau
@@ -75,6 +75,12 @@ run_stage() {
     case "$1" in
         format) stylua --check src tests scripts ;;
         lint) selene src tests scripts ;;
+        architecture)
+            # Dependency direction of the option chosen in basic design (copied from architecture/).
+            [ -s architecture.json ] || fail 'missing architecture.json; copy architecture/modules.json (default) or architecture/ecs.json'
+            rojo sourcemap default.project.json --output sourcemap.json
+            lune run scripts/check-architecture.luau architecture.json sourcemap.json
+            ;;
         typecheck)
             ensure_defs
             rojo sourcemap default.project.json --output sourcemap.json
@@ -96,7 +102,7 @@ run_stage() {
     esac
 }
 if [ "$stage" = all ]; then
-    for step in format lint typecheck test build similarity; do run_stage "$step"; done
+    for step in format lint architecture typecheck test build similarity; do run_stage "$step"; done
 else
     run_stage "$stage"
 fi

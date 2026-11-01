@@ -64,6 +64,8 @@ def build_one(path: Path, out: Path) -> None:
 
 def main() -> int:
     args = parse_args()
+    # Lets models/*.py import parts/ and geometry/ (README「アーキテクチャ」).
+    sys.path.insert(0, str(ROOT))
     models = sorted(p for p in (ROOT / "models").glob("*.py") if not p.name.startswith("_"))
     if not models:
         print("FAIL no models/*.py found")

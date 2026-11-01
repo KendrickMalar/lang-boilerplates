@@ -20,6 +20,8 @@ Godot **4.7.2**（標準版、.NET なし）と gdtoolkit **4.5.0**（gdlint / g
 | [scripts/check.sh](scripts/check.sh) | `scripts/check.sh` |
 | [scripts/test_runner.gd](scripts/test_runner.gd) | `scripts/test_runner.gd` |
 | [scripts/test_context.gd](scripts/test_context.gd) | `scripts/test_context.gd` |
+| [scripts/check_architecture.py](scripts/check_architecture.py) | `scripts/check_architecture.py` |
+| [architecture/scene-core.json](architecture/scene-core.json) または [architecture/features.json](architecture/features.json) | `architecture.json`（「アーキテクチャ」で選んだ1つ） |
 | [.husky/pre-commit](.husky/pre-commit) | `.husky/pre-commit` |
 | [.husky/pre-push](.husky/pre-push) | `.husky/pre-push` |
 | [LICENSE](LICENSE) | `LICENSE.lang-boilerplates` |
@@ -44,18 +46,22 @@ brew install uv
 uv tool install gdtoolkit==4.5.0 # gdlint / gdformat（~/.local/bin）
 ```
 
+architecture 段階は `python3`（3.9 以上、標準ライブラリだけ）を使います。macOS は Xcode Command Line Tools の
+`/usr/bin/python3` で足ります。
+
 ## チェック
 
 ```sh
 sh scripts/check.sh all
-sh scripts/check.sh format # format|lint|typecheck|test|all
+sh scripts/check.sh format # format|lint|architecture|typecheck|test|all
 ```
 
 | 段階 | コマンド |
 | --- | --- |
-| 事前確認 | godot・gdlint・gdformat の版が一致するか、`src/` か `tests/` に `.gd` があるか |
+| 事前確認 | godot・gdlint・gdformat の版が一致するか、python3 があるか、`src/` か `tests/` に `.gd` があるか |
 | format | `gdformat --check src tests scripts`（書換えなし） |
 | lint | `gdlint src tests scripts` |
+| architecture | `python3 scripts/check_architecture.py architecture.json`（層の依存の向き。下記「アーキテクチャ」） |
 | typecheck | `godot --headless --import` の後、各 `.gd` を `--check-only` で解析 |
 | test | `--import` の後 `godot --headless --path . --script scripts/test_runner.gd` |
 
@@ -85,6 +91,115 @@ func test_adds_points(t: TestContext) -> void:
 テストの中で `await` は使えません（最初の `await` で呼び出しが戻り、その後の記録を拾えないため、
 `await` したテストは失敗にします）。フレームやシグナルを待つ処理は、待たずに確かめられる純粋なロジックに
 分けてテストしてください。
+
+## アーキテクチャ
+
+scaffold の仕様策定でこの節の選択肢を提示し、基本設計で選んだ選択肢の規則と強制設定を導入します。
+
+### 選び方
+
+- 画面やシーンをまたいで使う計算（得点、ダメージ、経済、セーブデータの変換）が多く、それをテストしたいか
+  → はい: シーンの組み合わせ＋純粋な core
+- 機能（ショップ、図鑑、ミニゲーム）が互いに独立していて、機能単位で足したり外したりするか
+  → はい: 機能ごとのフォルダ
+- 迷ったら既定のシーンの組み合わせ＋純粋な core を選びます。
+
+どちらも `scripts/check_architecture.py`（Python 3.9 以上の標準ライブラリだけ。追加の依存なし）が、
+選んだ規則ファイルを `architecture.json` として読み、違反があれば非0で止めます。
+`check.sh all` の architecture 段階で動き、`architecture.json` が無いと失敗します。
+
+検査が拾うもの（`src/` の `.gd`・`.tscn`・`.tres`）:
+
+- `.gd` の文字列 `"res://..."`・`"uid://..."`（`preload`・`load`・`ResourceLoader.load`・`extends "res://..."` を含む）
+- `.tscn`・`.tres` の `path="res://..."`
+- `class_name` で宣言した名前の参照（`extends Player`・型注釈・`Player.new()`）
+- project.godot の `[autoload]` の名前の参照と、文字列 `"/root/<名前>"`
+- autoload が `src/autoload/` の外に登録されていること、どの層にも属さない `src/` のファイル
+
+検出しないもの: 文字列を組み立てたパス（`"res://src/" + name`）、`get_node()` に変数で渡したパス、
+`.tscn` に埋め込んだスクリプト、`src/` の外（`tests/`・`scripts/`・`addons/`）のファイル、
+エディタで付けたシグナル接続。これらはレビューで確かめます。コメントと文字列の中の名前は無視します。
+
+### シーンの組み合わせ＋純粋な core（既定）
+
+ゲームの規則を `src/core` の純粋な GDScript に置き、シーンとノードは `src/game`、画面は `src/ui` に置きます。
+親は子を呼び、子はシグナルで親に知らせます（[Godot のシーン構成](https://docs.godotengine.org/en/stable/tutorials/best_practices/scene_organization.html)）。
+
+```mermaid
+flowchart LR
+  ui[src/ui] --> game[src/game]
+  ui --> core[src/core]
+  game --> core
+  game --> autoload[src/autoload]
+  ui --> autoload
+  autoload --> core
+```
+
+矢印は「参照してよい向き」です。
+
+```text
+src/
+  core/      extends RefCounted の純粋なロジック（score.gd、rules.gd）
+  game/      シーン（.tscn）とノードのスクリプト（player.tscn、player.gd）
+  ui/        画面と HUD（hud.tscn、hud.gd）
+  autoload/  project.godot に登録するシングルトン（events.gd）
+tests/       core を中心にしたテスト（どの層も参照してよい）
+```
+
+| 規則 | 区分 |
+| --- | --- |
+| core は `RefCounted`・`Resource`・core 内のクラスだけを継承する | MUST |
+| core は `Node` とその派生（`Node2D`・`Control` など）を継承する | MUST NOT |
+| core は game・ui・autoload を `preload`・`load`・`class_name`・autoload 名で参照する | MUST NOT |
+| core は `get_tree()`・`get_node()`・`get_parent()`・`get_viewport()`・`Engine.get_main_loop()`・`$` を使う | MUST NOT |
+| game は ui を参照する | MUST NOT |
+| autoload は core だけを参照する | MUST |
+| autoload は `src/autoload/` に置いて登録する | MUST |
+| 親は子のメソッドを呼び、子はシグナルで親に知らせる（子から親を探さない） | MUST |
+
+- 向く: 規則が多いゲーム、規則をテストで守りたいゲーム、1〜数人の開発。
+- 向かない: 規則がほとんど無く、演出が中心の小さなゲーム（core が空になり層が重いだけになる）。
+- 強制設定: [architecture/scene-core.json](architecture/scene-core.json) を `architecture.json` として置き、
+  [scripts/check_architecture.py](scripts/check_architecture.py) を置きます。check.sh の all が
+  architecture 段階で実行します。
+
+### 機能ごとのフォルダ
+
+機能ごとに、シーンとスクリプトを `src/features/<名前>/` にまとめます。共通の部品は `src/shared` に置きます。
+
+```mermaid
+flowchart LR
+  shop[src/features/shop] --> shared[src/shared]
+  inventory[src/features/inventory] --> shared
+  shop --> autoload[src/autoload]
+  inventory --> autoload
+  autoload --> shared
+  shop -. 参照しない .- inventory
+```
+
+```text
+src/
+  features/
+    shop/        shop.tscn、shop.gd
+    inventory/   inventory.tscn、inventory.gd
+  shared/        複数の機能が使う部品とデータ（item.gd）
+  autoload/      機能の間でシグナルを中継するシングルトン（events.gd）
+tests/
+```
+
+| 規則 | 区分 |
+| --- | --- |
+| 機能は別の機能を `preload`・`load`・`class_name`・`.tscn` で参照する | MUST NOT |
+| 機能の間のやり取りは shared の部品か、autoload のシグナルを通す | MUST |
+| shared は機能と autoload を参照する | MUST NOT |
+| autoload は shared だけを参照する | MUST |
+| autoload は `src/autoload/` に置いて登録する | MUST |
+
+- 向く: 独立した機能が多く、機能ごとに担当や公開時期が分かれるゲーム。
+- 向かない: 機能をまたぐ規則が多いゲーム（規則が shared に溜まり、shared が肥大する）。
+- 強制設定: [architecture/features.json](architecture/features.json) を `architecture.json` として置き、
+  [scripts/check_architecture.py](scripts/check_architecture.py) を置きます。check.sh の all が
+  architecture 段階で実行します。
 
 ## Husky による Git フック（必須・明示有効化）
 

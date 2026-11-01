@@ -32,14 +32,19 @@ ROBLOX_FILES = {'README.md', 'LICENSE', '.editorconfig', '.gitignore', 'rokit.to
                 'luau-similarity.lock.json', 'scripts/.luaurc', 'scripts/similarity.luau',
                 'scripts/setup-similarity.luau', 'scripts/verify-similarity.luau', 'scripts/check-git.luau',
                 'scripts/git-state.luau', 'scripts/test-helpers.luau',
+                'architecture/modules.json', 'architecture/ecs.json', 'scripts/check-architecture.luau',
                 '.husky/pre-commit', '.husky/pre-push'}
 GODOT_FILES = {'README.md', 'LICENSE', '.editorconfig', '.gitignore', '.gitattributes',
                'project.godot', 'gdlintrc', 'gdformatrc', 'src/.gitkeep', 'tests/.gitkeep',
                'scripts/check.sh', 'scripts/test_runner.gd', 'scripts/test_context.gd',
-               '.husky/pre-commit', '.husky/pre-push'}
+               'scripts/check_architecture.py', 'architecture/scene-core.json',
+               'architecture/features.json', '.husky/pre-commit', '.husky/pre-push'}
 BLENDER_FILES = {'README.md', 'LICENSE', '.editorconfig', '.gitignore', 'pyproject.toml',
                  'models/.gitkeep', 'tests/.gitkeep', 'scripts/check.sh', 'scripts/build.py',
-                 'scripts/test.py', '.husky/pre-commit', '.husky/pre-push'}
+                 'scripts/test.py', '.husky/pre-commit', '.husky/pre-push',
+                 'architecture/flat/models/ruff.toml', 'architecture/flat/parts/ruff.toml',
+                 'architecture/geometry/models/ruff.toml', 'architecture/geometry/parts/ruff.toml',
+                 'architecture/geometry/geometry/ruff.toml'}
 
 
 def links(path):

@@ -114,6 +114,8 @@ def copy_fixture(name: str, *, similarity: bool = True) -> Path:
     (root / "src/shared/Greeting.luau").write_text(GREETING_SOURCE)
     (root / "tests/Greeting.spec.luau").write_text(GREETING_SPEC)
     shutil.copy2(SEED / "roblox.yml", root / "roblox.yml")
+    # The default architecture option; the architecture stage refuses to run without a rule file.
+    shutil.copy2(root / "architecture/modules.json", root / "architecture.json")
     (root / ".luau-lsp-cache").mkdir()
     shutil.copy2(SEED / "globalTypes-1.69.0.d.luau", root / ".luau-lsp-cache/globalTypes-1.69.0.d.luau")
     if similarity:

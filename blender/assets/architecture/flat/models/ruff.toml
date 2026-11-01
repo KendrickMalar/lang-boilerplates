@@ -1,0 +1,9 @@
+# models/: one model per file. A model must not import another model (README「アーキテクチャ」).
+extend = "../pyproject.toml"
+
+[lint.flake8-tidy-imports]
+# `from . import other` / `from .other import x` would bypass the `models` ban.
+ban-relative-imports = "all"
+
+[lint.flake8-tidy-imports.banned-api]
+"models".msg = "models/ must not import another model; move shared code to parts/"

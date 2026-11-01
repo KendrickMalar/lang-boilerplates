@@ -5,8 +5,8 @@ fail() { printf '%s\n' "error: $*" >&2; exit 1; }
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 stage=${1:-all}
-[ "$#" -le 1 ] || fail 'usage: check.sh [format|lint|typecheck|test|all]'
-case "$stage" in format|lint|typecheck|test|all) ;; *) fail "unknown stage: $stage" ;; esac
+[ "$#" -le 1 ] || fail 'usage: check.sh [format|lint|architecture|typecheck|test|all]'
+case "$stage" in format|lint|architecture|typecheck|test|all) ;; *) fail "unknown stage: $stage" ;; esac
 GODOT_VERSION=4.7.2
 GDTOOLKIT_VERSION=4.5.0
 
@@ -14,6 +14,8 @@ need() { command -v "$1" >/dev/null 2>&1 || fail "$1 is missing; install it (see
 need godot
 need gdlint
 need gdformat
+need python3
+printf '%s\n' "tool: $(command -v python3) $(python3 --version 2>&1)"
 actual=$(godot --version </dev/null 2>&1) || fail "cannot read godot version: $actual"
 printf '%s\n' "tool: $(command -v godot) $actual"
 case "$actual" in "$GODOT_VERSION.stable"*) ;; *) fail "godot must be $GODOT_VERSION (found: $actual)" ;; esac
@@ -43,6 +45,8 @@ run_stage() {
     case "$1" in
         format) gdformat --check src tests scripts ;;
         lint) gdlint src tests scripts ;;
+        # Layer rules chosen from README「アーキテクチャ」; missing architecture.json fails.
+        architecture) python3 scripts/check_architecture.py architecture.json ;;
         typecheck)
             godot_run --import || fail 'godot import failed'
             find src tests scripts -type f -name '*.gd' | sort | while IFS= read -r file; do
@@ -56,7 +60,7 @@ run_stage() {
     esac
 }
 if [ "$stage" = all ]; then
-    for step in format lint typecheck test; do run_stage "$step"; done
+    for step in format lint architecture typecheck test; do run_stage "$step"; done
 else
     run_stage "$stage"
 fi
