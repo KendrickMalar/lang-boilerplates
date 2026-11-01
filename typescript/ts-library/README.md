@@ -167,6 +167,212 @@ commit前は`node check-commit.mjs`が**pnpm check全体**を実行します。�
 
 Huskyと直接Git hooksはどちらもローカル検査です。未導入端末・GitHub上の直接編集・hookスキップを防ぐ強制力はありません。失敗をスキップで回避しません。GitHub側CI・必須チェックはこの設定の対象外です。
 
+## アーキテクチャ
+
+scaffold は仕様策定でこの節の選択肢を人に提示し、基本設計で選ばれた選択肢の規則と強制設定（`architecture/`）を導入します。
+
+### 選び方
+
+- 公開する API が1つのまとまりで、利用者は `import { … } from "<パッケージ名>"` だけを使うか → **入口1つ＋internal**（既定。迷ったらこれ）
+- Node・ブラウザ・Deno など実行環境ごとに入出力の実装を分け、本体は環境に依らず動かしたいか → **コア＋実行環境アダプター**
+- 互いに独立した機能を、利用者が必要な分だけ `"<パッケージ名>/<機能>"` で読み込めるようにしたいか → **機能別の複数入口**
+
+### 入口1つ＋internal（既定）
+
+公開 API を `src/index.ts` だけに集め、実装は `src/internal/` に隠します。
+
+```mermaid
+flowchart LR
+  user["利用者"] --> index["src/index.ts（公開 API）"]
+  index --> internal["src/internal/**"]
+```
+
+| 層・ファイル    | 置くもの                                      |
+| --------------- | --------------------------------------------- |
+| `src/index.ts`  | 公開する関数・型の再公開と、公開 API の型注釈 |
+| `src/internal/` | 実装。利用者からは見えない                    |
+
+| 規則                                                        | 区分     |
+| ----------------------------------------------------------- | -------- |
+| 公開するものは `src/index.ts` から export する              | MUST     |
+| `src/internal/**` は `src/index.ts` を import する          | MUST NOT |
+| src の中で import を循環させる（型だけの import も含む）    | MUST NOT |
+| `src/index.ts` と `src/internal/` の外に src ファイルを置く | MUST NOT |
+
+- 向く: 小〜中規模のライブラリ。公開 API を1か所で見渡したい。
+- 向かない: 実行環境ごとに実装が分かれる、または機能ごとに別々に読み込ませたい。
+
+強制設定: [architecture/single-entry.mjs](./architecture/single-entry.mjs)（eslint-plugin-boundaries）と [architecture/single-entry.depcruise.mjs](./architecture/single-entry.depcruise.mjs)（dependency-cruiser の循環検出）。
+
+1. 2つのファイルを対象プロジェクトの同じパスへコピーします。既存ファイルがあれば停止して差分を確認します。
+2. `eslint.config.mjs` を次の内容にします。既存の設定があれば丸ごと置き換えず、`architecture` の import と末尾の追加だけを統合します。
+3. package.json の `lint` を `"lint": "eslint . --max-warnings 0 && depcruise src --config architecture/single-entry.depcruise.mjs"` にします。`pnpm lint`（`pnpm check` の Lint 段、commit 前・push 前のフック）が層の規則と循環を検査します。`check` の変更は不要です。
+
+```js
+import { createConfig } from "./eslint.base.mjs";
+import architecture from "./architecture/single-entry.mjs";
+
+export default [
+  ...createConfig({
+    environment: "node",
+    testFiles: [
+      "tests/**/*.{test,spec}.{ts,mts,cts}",
+      "src/**/*.{test,spec}.{ts,mts,cts}",
+      "src/**/__tests__/**/*.{ts,mts,cts}",
+    ],
+  }),
+  {
+    files: ["src/**/*.{ts,mts,cts}"],
+    ignores: [
+      "src/**/*.test.{ts,mts,cts}",
+      "src/**/*.spec.{ts,mts,cts}",
+      "src/**/__tests__/**",
+    ],
+    rules: { "@typescript-eslint/explicit-module-boundary-types": "error" },
+  },
+  ...architecture,
+];
+```
+
+検査対象は src の JS/TS で、併置テスト（`*.test.*`・`*.spec.*`・`__tests__`）と `tests/**` は対象外です。`.js` 付きの import は eslint-import-resolver-typescript で `.ts` へ解決します。resolver を外すと層を判定できず、すべての import が違反になります（黙って見逃さない）。例外が要るときは規則を消さず、policy を足して理由をこの README に残します。
+
+### コア＋実行環境アダプター
+
+環境に依らない本体を `src/core/` に置き、Node・ブラウザなど環境ごとの入出力を `src/adapters/<名前>/` に分けます。アダプターはサブパスとして公開します。
+
+```mermaid
+flowchart LR
+  user["利用者"] --> index["src/index.ts（環境に依らない入口）"]
+  user --> nodeEntry["src/adapters/node/index.ts"]
+  user --> browserEntry["src/adapters/browser/index.ts"]
+  index --> core["src/core/**"]
+  nodeEntry --> core
+  browserEntry --> core
+```
+
+| 層・ファイル                   | 置くもの                                                       |
+| ------------------------------ | -------------------------------------------------------------- |
+| `src/core/`                    | 環境に依らない本体。入出力は引数の口（interface）で受け取る    |
+| `src/adapters/<名前>/`         | 環境ごとの口の実装（`node:*`・DOM・環境専用パッケージ）        |
+| `src/adapters/<名前>/index.ts` | そのアダプターの公開入口（サブパス `"<パッケージ名>/<名前>"`） |
+| `src/index.ts`                 | 環境に依らない入口。core だけを再公開する                      |
+
+| 規則                                                                                                     | 区分     |
+| -------------------------------------------------------------------------------------------------------- | -------- |
+| core は `node:*`・adapters・環境だけのグローバル（`process`・`document` など）・入出力のグローバルを使う | MUST NOT |
+| アダプターは core・外部パッケージ・`node:*` を import できる                                             | MUST     |
+| アダプター同士は import する                                                                             | MUST NOT |
+| `src/index.ts` は core と外部パッケージ以外を import する                                                | MUST NOT |
+| `src/index.ts`・core・adapters の外に src ファイルを置く                                                 | MUST NOT |
+
+package.json の exports にアダプターのサブパスを足します（例。tsconfig.build.json の出力先 `dist` に合わせます）。
+
+```json
+{
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./node": {
+      "types": "./dist/adapters/node/index.d.ts",
+      "import": "./dist/adapters/node/index.js"
+    }
+  }
+}
+```
+
+- 向く: 同じ処理を Node・ブラウザ・エッジなど複数の環境で使わせたい。
+- 向かない: 1つの環境でしか動かない（入口1つ＋internal で足りる）。
+
+強制設定: [architecture/core-adapters.mjs](./architecture/core-adapters.mjs)。導入手順は入口1つ＋internal の 1・2 と同じで、コピーするファイルと `eslint.config.mjs` を次にします。`lint` の変更は不要です。
+
+```js
+import { createConfig } from "./eslint.base.mjs";
+import architecture from "./architecture/core-adapters.mjs";
+
+export default [
+  ...createConfig({
+    environment: "node",
+    testFiles: [
+      "tests/**/*.{test,spec}.{ts,mts,cts}",
+      "src/**/*.{test,spec}.{ts,mts,cts}",
+      "src/**/__tests__/**/*.{ts,mts,cts}",
+    ],
+  }),
+  {
+    files: ["src/**/*.{ts,mts,cts}"],
+    ignores: [
+      "src/**/*.test.{ts,mts,cts}",
+      "src/**/*.spec.{ts,mts,cts}",
+      "src/**/__tests__/**",
+    ],
+    rules: { "@typescript-eslint/explicit-module-boundary-types": "error" },
+  },
+  ...architecture,
+];
+```
+
+### 機能別の複数入口
+
+機能ごとに `src/features/<名前>/` を作り、それぞれの `index.ts` をサブパスとして公開します。機能同士は依存しません。
+
+```mermaid
+flowchart LR
+  user["利用者"] --> entryA["src/features/a/index.ts"]
+  user --> entryB["src/features/b/index.ts"]
+  user --> index["src/index.ts（任意の集約入口）"]
+  index --> entryA
+  index --> entryB
+  entryA --> shared["src/shared/**"]
+  entryB --> shared
+```
+
+| 層・ファイル                   | 置くもの                                             |
+| ------------------------------ | ---------------------------------------------------- |
+| `src/features/<名前>/`         | 機能の実装                                           |
+| `src/features/<名前>/index.ts` | 機能の公開入口（サブパス `"<パッケージ名>/<名前>"`） |
+| `src/shared/`                  | 複数の機能が使う実装（機能を知らない）               |
+| `src/index.ts`                 | 任意。各機能の `index.ts` を再公開するだけの集約入口 |
+
+| 規則                                                       | 区分     |
+| ---------------------------------------------------------- | -------- |
+| 機能は他の機能を import する（`index.ts` 経由も不可）      | MUST NOT |
+| 機能は shared・外部パッケージ・`node:*` を import できる   | MUST     |
+| shared は機能を import する                                | MUST NOT |
+| `src/index.ts` は機能の `index.ts` 以外を import する      | MUST NOT |
+| `src/index.ts`・features・shared の外に src ファイルを置く | MUST NOT |
+
+package.json の exports に機能ごとのサブパスを足します（例: `"./parse": { "types": "./dist/features/parse/index.d.ts", "import": "./dist/features/parse/index.js" }`）。
+
+- 向く: 独立したユーティリティ群。利用者が必要な機能だけを読み込み、バンドルを小さくしたい。
+- 向かない: 機能同士が密に連携する（入口1つ＋internal が合う）。
+
+強制設定: [architecture/multi-entry.mjs](./architecture/multi-entry.mjs)。導入手順は入口1つ＋internal の 1・2 と同じで、コピーするファイルと `eslint.config.mjs` を次にします。`lint` の変更は不要です。
+
+```js
+import { createConfig } from "./eslint.base.mjs";
+import architecture from "./architecture/multi-entry.mjs";
+
+export default [
+  ...createConfig({
+    environment: "node",
+    testFiles: [
+      "tests/**/*.{test,spec}.{ts,mts,cts}",
+      "src/**/*.{test,spec}.{ts,mts,cts}",
+      "src/**/__tests__/**/*.{ts,mts,cts}",
+    ],
+  }),
+  {
+    files: ["src/**/*.{ts,mts,cts}"],
+    ignores: [
+      "src/**/*.test.{ts,mts,cts}",
+      "src/**/*.spec.{ts,mts,cts}",
+      "src/**/__tests__/**",
+    ],
+    rules: { "@typescript-eslint/explicit-module-boundary-types": "error" },
+  },
+  ...architecture,
+];
+```
+
 ## 公式資料
 
 - https://www.typescriptlang.org/tsconfig/
