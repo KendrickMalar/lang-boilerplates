@@ -16,6 +16,16 @@ for (const name of ["library", "node", "web", "web-game-3d"]) {
   });
 }
 
+test("untested JavaScript files under src also count", async () => {
+  const root = await copyPreset("node");
+  await write(
+    root,
+    "src/util.js",
+    "export function untested(value) {\n  return value > 0 ? value * 2 : -value;\n}\n",
+  );
+  await expectResult(root, ["test"], 1, THRESHOLD_MISS);
+});
+
 test("colocated tests under src are not counted as product code", async () => {
   const root = await copyPreset("library");
   await write(

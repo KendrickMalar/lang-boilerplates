@@ -99,7 +99,7 @@ tool 不足・版違い・source なし・Cargo.lock なし・テスト0件は�
 | advisories | `cargo deny check advisories`（RustSec の advisory DB を取得） | **あり** |
 | build | `cargo build --workspace --locked --release` | なし |
 
-行カバレッジの下限は **90%** です（doctest は数えません）。commit のたびに検査します（2026-11-01 改訂。以前は push 時だけ）。テストは coverage 段で1回だけ実行します。変えるときは `scripts/check.sh` の
+行カバレッジの下限は **90%** です（doctest は数えません）。commit のたびに検査します（2026-11-01 改訂。以前は push 時だけ）。テストは coverage 段で1回だけ実行します。テストは `main()` を呼ばないので、`main.rs` の行は下限を下げます。処理は lib crate に置き、`main.rs` は数行にとどめてください（Rust 1.99.1 の stable では `#[coverage(off)]` は使えません）。変えるときは `scripts/check.sh` の
 `line_floor=90` の数値を変え、理由を製品 README に残してください（`--fail-under-lines` とエラー文はこの値を使います）。
 下限を割ると `error: line coverage below 90% (--fail-under-lines 90)` を出して非0で止まります。
 テストの失敗は、この文言を出さずに nextest の結果のまま止まります。

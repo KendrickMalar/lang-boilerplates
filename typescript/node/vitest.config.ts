@@ -9,7 +9,7 @@ export default defineConfig({
       // explicitly with /* v8 ignore start */ ... /* v8 ignore stop */ comments.
       enabled: true,
       provider: "v8",
-      include: ["src/**/*.{ts,mts,cts,tsx}"],
+      include: ["src/**/*.{ts,mts,cts,tsx,js,mjs,cjs}"],
       reporter: ["text"],
       thresholds: { lines: 90, branches: 90, functions: 90, statements: 90 },
     },

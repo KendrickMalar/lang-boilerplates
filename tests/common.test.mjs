@@ -85,12 +85,18 @@ test("each leaf enforces 90% Vitest coverage over all of src", () => {
     for (const text of [
       "enabled: true",
       'provider: "v8"',
-      'include: ["src/**/*.{ts,mts,cts,tsx}"]',
+      'include: ["src/**/*.{ts,mts,cts,tsx,js,mjs,cjs}"]',
       "thresholds: { lines: 90, branches: 90, functions: 90, statements: 90 }",
     ])
       assert.ok(config.includes(text), name + " vitest.config.ts: " + text);
     const readme = readFileSync(join(dir, "README.md"), "utf8");
-    for (const text of ["カバレッジ", "90%", "v8 ignore"])
+    for (const text of [
+      "カバレッジ",
+      "90%",
+      "v8 ignore",
+      ".js/.mjs/.cjs",
+      "集計対象が0件",
+    ])
       assert.ok(readme.includes(text), name + " README: " + text);
   }
 });
