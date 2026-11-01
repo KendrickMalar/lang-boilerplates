@@ -1,0 +1,17 @@
+# Architecture: ecs (rust/game). A second cargo-deny pass run by
+# scripts/check-architecture.sh: `cargo deny --offline --config architecture/deny.toml check bans`.
+# wrappers = the only crates that may depend on the crate directly. Every other rule stays in
+# the root deny.toml. Add companion crates that wrap these (e.g. axum-extra) to `wrappers`.
+[graph]
+all-features = true
+
+[bans]
+multiple-versions = "allow"
+wildcards = "allow"
+deny = [
+    { crate = "hecs", wrappers = ["sim"], reason = "the ECS stays inside sim" },
+    { crate = "bevy_ecs", wrappers = ["sim"], reason = "the ECS stays inside sim" },
+    { crate = "axum", wrappers = ["gateway", "server"], reason = "WebSocket and HTTP live only in gateway (served by server)" },
+    { crate = "sqlx", wrappers = ["store"], reason = "persistence lives only in store" },
+    { crate = "redis", wrappers = ["store"], reason = "persistence lives only in store" },
+]

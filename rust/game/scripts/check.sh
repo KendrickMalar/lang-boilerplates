@@ -167,6 +167,7 @@ run_stage() {
         deps)
             "$shear" shear
             "$deny" deny --offline check bans licenses sources
+            sh scripts/check-architecture.sh "$deny"
             ;;
         test)
             "$nextest" nextest run --workspace --locked --no-tests=fail

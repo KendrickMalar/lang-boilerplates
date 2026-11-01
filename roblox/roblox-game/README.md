@@ -32,6 +32,8 @@ Wally **0.3.2**。製品 source、`roblox.yml`、`wally.lock`、fixture/cache �
 | [scripts/check-git.luau](scripts/check-git.luau)                 | `scripts/check-git.luau`                          |
 | [scripts/git-state.luau](scripts/git-state.luau)                 | `scripts/git-state.luau`                          |
 | [scripts/test-helpers.luau](scripts/test-helpers.luau)           | `scripts/test-helpers.luau`                       |
+| [scripts/check-architecture.luau](scripts/check-architecture.luau) | `scripts/check-architecture.luau`               |
+| [architecture/modules.json](architecture/modules.json) または [architecture/ecs.json](architecture/ecs.json) | `architecture.json`（基本設計で選んだ1つ） |
 | [.husky/pre-commit](.husky/pre-commit)                     | `.husky/pre-commit`                            |
 | [.husky/pre-push](.husky/pre-push)                         | `.husky/pre-push`                              |
 | [LICENSE](LICENSE)                                               | `LICENSE.lang-boilerplates`                       |
@@ -48,6 +50,144 @@ Rojo の配置は次の通りです。`Packages` は optional なので、`wally
 | `src/client` | `StarterPlayer.StarterPlayerScripts.Client` |
 | `src/shared` | `ReplicatedStorage.Shared`                  |
 | `Packages`   | `ReplicatedStorage.Packages`                |
+
+## アーキテクチャ
+
+scaffold の仕様策定でこの節の選択肢を人に提示し、基本設計で選んだ選択肢の規則と強制設定を導入します。
+導入するのは選んだ1つだけです。`architecture/<選択肢>.json` を製品 root の `architecture.json` へコピーし、
+`sh scripts/check.sh architecture`（`all` にも含まれる）で依存の向きを検査します。
+
+### 選び方
+
+- 同じ種類のものが大量に並び、毎フレーム一括で更新するか（弾・敵の群れ・建物の大量シミュレーション）
+  → はい: ECS。いいえ: 次へ。
+- 機能ごとに状態を持つ「係」（戦闘・データ保存・ショップ・UI）を足していくゲームか
+  → はい: 素の ModuleScript＋共有の純粋ロジック（既定）。
+- 迷う、またはチームに ECS の経験者がいない → 既定を選びます。途中で切り替えるときは
+  `architecture.json` を差し替え、検査が出す違反を直してから進めます。
+- 型安全な ECS 実装が必要か → jecs。Matter は新規採用しません（下記の現状）。
+
+### 素の ModuleScript＋共有の純粋ロジック（既定）
+
+規則・型・通信の定義を `shared/` に置き、サーバーの係（services）とクライアントの係（controllers）が
+それを使います。起動スクリプトはサーバー・クライアントで各1本だけ置き、係を順に起動します。
+Knit は 2024-07 にアーカイブ済みなので使いません。作者の推奨どおり、素の ModuleScript、
+RemoteEvent を薄く包む自作層、受信データの実行時検証で組みます。
+
+矢印は「require する向き」です。
+
+```mermaid
+flowchart LR
+    boot_s["server/main.server.luau"] --> services["server/services/*"]
+    boot_c["client/main.client.luau"] --> controllers["client/controllers/*"]
+    services --> shared["shared/*（規則・型・通信の定義）"]
+    controllers --> shared
+    boot_s --> shared
+    boot_c --> shared
+```
+
+| ファイル                      | Roblox 上の配置                                         | 中身                                     |
+| ----------------------------- | ------------------------------------------------------- | ---------------------------------------- |
+| `src/shared/*`                | `ReplicatedStorage.Shared`                              | 純粋な規則・型・RemoteEvent の名前と検証 |
+| `src/server/main.server.luau` | `ServerScriptService.Server.main`                       | サーバーの起動（1本）                    |
+| `src/server/services/*`       | `ServerScriptService.Server.services`                   | サーバーの係。`Start(deps)` を持つ       |
+| `src/client/main.client.luau` | `StarterPlayer.StarterPlayerScripts.Client.main`        | クライアントの起動（1本）                |
+| `src/client/controllers/*`    | `StarterPlayer.StarterPlayerScripts.Client.controllers` | クライアントの係。`Start(deps)` を持つ   |
+
+| 規則                                                                                                               | 区分     |
+| ------------------------------------------------------------------------------------------------------------------ | -------- |
+| shared は shared と Packages だけを require する                                                                   | MUST     |
+| shared は server・client（services・controllers・起動スクリプト）を require しない                                 | MUST NOT |
+| shared は ServerScriptService・ServerStorage・DataStoreService・MemoryStoreService・MessagingService を使わない    | MUST NOT |
+| shared に秘密（API キー・判定用の隠し値）を置かない（クライアントへ複製されるため。検査対象外、レビューで確認）    | MUST NOT |
+| client（controllers・起動スクリプト）は server を require しない                                                   | MUST NOT |
+| client も上記のサーバー専用サービスを使わない                                                                      | MUST NOT |
+| services 同士・controllers 同士・shared 内で循環しない。相互に使う係は `Start(deps)` で渡す                        | MUST NOT |
+| 起動スクリプトは `src/server`・`src/client` の直下に各1本。ModuleScript はその直下に置かず services/controllers へ | MUST     |
+| サーバーはクライアントから受け取った値を実行時に検証する（検査対象外、レビューで確認）                             | MUST     |
+
+- 向く: 係ごとに機能を足す一般的なゲーム、少人数・Roblox 初学者を含むチーム、Studio で確認しながら作る開発。
+- 向かない: 数千単位の同種オブジェクトを毎フレーム更新するゲーム（係の中に巨大なループが生まれる）。
+- 強制設定: [architecture/modules.json](architecture/modules.json) と
+  [scripts/check-architecture.luau](scripts/check-architecture.luau)。
+  `architecture/modules.json` を `architecture.json` へコピーするだけで、`scripts/check.sh` の
+  `architecture` 段階（lint の後、typecheck の前）が検査します。製品の Git に `architecture.json` を保存します。
+  解決の仕方と検出しないものは[アーキテクチャ検査の仕様](#アーキテクチャ検査の仕様両選択肢共通)にあります。
+
+### ECS（jecs または Matter）
+
+データだけのコンポーネントを `shared/components` に置き、サーバー・クライアントのシステムがそれを読み書きします。
+システム同士は require せず、ワールド上のデータを介してだけ連携します。起動スクリプトがシステムを順に回します。
+
+```mermaid
+flowchart LR
+    boot_s["server/main.server.luau"] --> ssys["server/systems/*"]
+    boot_c["client/main.client.luau"] --> csys["client/systems/*"]
+    ssys --> components["shared/components/*（データだけ）"]
+    csys --> components
+    ssys --> shared["shared/*（ワールド生成・純粋な補助）"]
+    csys --> shared
+    shared --> components
+    components --> packages["Packages（jecs / Matter）"]
+```
+
+| ファイル                      | Roblox 上の配置                                     | 中身                                |
+| ----------------------------- | --------------------------------------------------- | ----------------------------------- |
+| `src/shared/components/*`     | `ReplicatedStorage.Shared.components`               | コンポーネントの定義だけ            |
+| `src/shared/*`                | `ReplicatedStorage.Shared`                          | ワールドの生成・純粋な補助          |
+| `src/server/main.server.luau` | `ServerScriptService.Server.main`                   | サーバーのシステムを回す（1本）     |
+| `src/server/systems/*`        | `ServerScriptService.Server.systems`                | サーバーのシステム                  |
+| `src/client/main.client.luau` | `StarterPlayer.StarterPlayerScripts.Client.main`    | クライアントのシステムを回す（1本） |
+| `src/client/systems/*`        | `StarterPlayer.StarterPlayerScripts.Client.systems` | クライアントのシステム              |
+
+| 規則                                                                                      | 区分     |
+| ----------------------------------------------------------------------------------------- | -------- |
+| components は components と Packages だけを require する（データだけ）                    | MUST     |
+| shared は shared・components・Packages だけを require する                                | MUST     |
+| systems 同士（同じ側の systems）は require しない                                         | MUST NOT |
+| shared・components は server・client を require しない                                    | MUST NOT |
+| client（systems・起動スクリプト）は server を require しない                              | MUST NOT |
+| shared・components・client はサーバー専用サービスを使わない（既定と同じ一覧）             | MUST NOT |
+| 起動スクリプトは `src/server`・`src/client` の直下に各1本。ModuleScript は systems などへ | MUST     |
+
+- 向く: 同種オブジェクトが大量にある、または性能を詰めたいゲーム。データと処理を分けて試験したいとき。
+- 向かない: 係ごとの手続きが中心の小さなゲーム、ECS 未経験のチーム（学習コストが上回る）。
+- 強制設定: [architecture/ecs.json](architecture/ecs.json) と
+  [scripts/check-architecture.luau](scripts/check-architecture.luau)。
+  `architecture/ecs.json` を `architecture.json` へコピーします。check への組み込みは既定と同じです。
+- ライブラリの現状（2026-11-01 に GitHub で確認）:
+  - jecs（`Ukendio/jecs`、Wally `ukendio/jecs`）: 最新 v0.11.0（2026-03-10）、2026-10 にもコミットがあり保守中。
+    ECS を選ぶならこちらを推奨します。
+  - Matter: 元の `evaera/matter` は 2024-07 にアーカイブ済み。後継の `matter-ecs/matter` は
+    最新安定版 v0.8.5（2024-12-09）、v0.9.0-beta.0 の後は 2024-12 以降コミットがありません。新規採用しません。
+- 依存の導入: この boilerplate は Wally 依存を同梱しません。基本設計で承認を得てから、製品の `wally.toml` の
+  `[dependencies]` に版を固定して追記し（例: `jecs = "ukendio/jecs@0.11.0"`）、`wally install` を実行して
+  `wally.lock` を保存します。require は `require(ReplicatedStorage.Packages.jecs)` の形で書きます。
+
+## アーキテクチャ検査の仕様（両選択肢共通）
+
+[scripts/check-architecture.luau](scripts/check-architecture.luau) は Lune で動き、ファイルを書き換えません。
+selene の `restricted_module_paths` は文字列の require を検査せず、完全一致だけでディレクトリ単位の指定も
+できないため、依存の向きの強制には使いません。
+
+1. `rojo sourcemap` の JSON を読み、`src` 以下の `.luau`/`.lua` を `architecture.json` の層に割り当てます
+   （深いパスの層が優先）。どの層にも入らないファイルは違反です。
+2. `require` を次のように解決します。
+   - 文字列: `./`・`../`（init ファイルはディレクトリの親が基準）、init ファイル内の `@self/`、
+     `.luaurc` の `aliases`。`Packages/` 以下は Packages 扱い（`wally install` 前でも可）。
+   - インスタンスのパス: `script`・`game`・`game:GetService("名前")` から `.Parent`・`.名前`・`["名前"]`・
+     `:WaitForChild("名前")`・`:FindFirstChild("名前")` をたどり、sourcemap で実ファイルに変換します。
+     `local X = game:GetService("ReplicatedStorage")` のような、パスを入れた local も追います。
+3. 層ごとの許可表（`mayRequire`）に無い向き、`acyclic` の層の中の循環、禁止サービスの `GetService`・
+   `game.名前`、起動スクリプトの数と置き場所、`modules: false` の層に直に置いた ModuleScript を違反にします。
+4. 違反を `architecture: <ファイル>:<行>: <内容>` で全件表示し、1件でもあれば非0で終わります。
+   `architecture.json` が無い、未知のキーがある、型が違う場合も非0です。
+
+動的な require は安全側で違反にします（検出しない扱いにはしません）。次の書き方は解決できないので
+`dynamic require cannot be checked` や `require used as a value` で止まります: 変数を組み立てた
+`script.Parent[name]`、関数呼び出しの戻り値、`local load = require` のような別名、
+init ファイル以外での `@self`、未知の alias。固定の文字列か固定のインスタンスのパスに書き換えてください。
+local の追跡はスコープを見ず、手前で最後に代入された値を使います。代入し直しや引数で渡したインスタンスは追いません。
 
 ## tool と定義ファイル
 
@@ -98,7 +238,7 @@ CLI archive内のLICENSE・third-party noticesを維持し、MPL sourceは同じ
 
 ```sh
 sh scripts/check.sh all
-sh scripts/check.sh format # format|lint|typecheck|test|build|similarity|all
+sh scripts/check.sh format # format|lint|architecture|typecheck|test|build|similarity|all
 ```
 
 | 段階       | コマンド                                                                                                                             |
@@ -106,6 +246,7 @@ sh scripts/check.sh format # format|lint|typecheck|test|build|similarity|all
 | 事前確認   | `rokit.toml` の各 tool が PATH にあり `--version` が一致するか                                                                       |
 | format     | `stylua --check src tests scripts`（書換えなし）                                                                                     |
 | lint       | `selene src tests scripts`（警告も不合格）                                                                                           |
+| architecture | `rojo sourcemap` → `lune run scripts/check-architecture.luau architecture.json sourcemap.json`（[アーキテクチャ](#アーキテクチャ)） |
 | typecheck  | `rojo sourcemap` → 型定義の取得・SHA256 照合 → `luau-lsp analyze --platform=roblox`（strict）→ Lune helpersをstandard platformで解析 |
 | test       | helper純粋unit試験（Git hookの再帰なし）→ `lune run scripts/test.luau`                                                               |
 | build      | `rojo build` で一時ディレクトリに place を出力し、確認後に削除                                                                       |
@@ -113,7 +254,7 @@ sh scripts/check.sh format # format|lint|typecheck|test|build|similarity|all
 
 最初の失敗で停止します（成功0、不合格非0）。次の場合も非0です: tool 不在・版違い、`src` に
 `.luau` が無い、`roblox.yml` が無い、`wally.toml` に依存があるのに `Packages/` が無い、
-型定義の SHA256 不一致（キャッシュ済みも毎回照合。壊れたら削除して再取得）、テスト0件、
+型定義の SHA256 不一致（キャッシュ済みも毎回照合。壊れたら削除して再取得）、`architecture.json` が無い、依存の向きの違反、テスト0件、
 `rokit.toml` の `[tools]` に読めない行がある（行末コメント等）、server/dev 依存がある。
 
 ## 型・lint・書式の分担

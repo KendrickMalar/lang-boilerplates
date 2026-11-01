@@ -1,0 +1,45 @@
+{
+	"schema": 1,
+	"architecture": "modules",
+	"sourceRoot": "src",
+	"packages": { "path": "Packages", "instance": ["ReplicatedStorage", "Packages"] },
+	"layers": [
+		{
+			"name": "shared",
+			"path": "src/shared",
+			"mayRequire": ["shared", "packages"],
+			"acyclic": true,
+			"forbiddenServices": ["ServerScriptService", "ServerStorage", "DataStoreService", "MemoryStoreService", "MessagingService"]
+		},
+		{
+			"name": "services",
+			"path": "src/server/services",
+			"mayRequire": ["shared", "services", "packages"],
+			"acyclic": true
+		},
+		{
+			"name": "server",
+			"path": "src/server",
+			"mayRequire": ["shared", "services", "packages"],
+			"modules": false
+		},
+		{
+			"name": "controllers",
+			"path": "src/client/controllers",
+			"mayRequire": ["shared", "controllers", "packages"],
+			"acyclic": true,
+			"forbiddenServices": ["ServerScriptService", "ServerStorage", "DataStoreService", "MemoryStoreService", "MessagingService"]
+		},
+		{
+			"name": "client",
+			"path": "src/client",
+			"mayRequire": ["shared", "controllers", "packages"],
+			"modules": false,
+			"forbiddenServices": ["ServerScriptService", "ServerStorage", "DataStoreService", "MemoryStoreService", "MessagingService"]
+		}
+	],
+	"bootScripts": [
+		{ "path": "src/server", "kind": "server", "max": 1 },
+		{ "path": "src/client", "kind": "client", "max": 1 }
+	]
+}

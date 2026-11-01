@@ -1,0 +1,24 @@
+{
+  "architecture": "scene-core",
+  "source": "src",
+  "autoload_layer": "autoload",
+  "layers": [
+    {
+      "name": "core",
+      "path": "src/core",
+      "may_depend_on": [],
+      "allowed_extends": ["RefCounted", "Resource"],
+      "forbidden": [
+        {"pattern": "\\bget_tree\\s*\\(", "message": "core must not call get_tree()"},
+        {"pattern": "\\bget_node(_or_null)?\\s*\\(", "message": "core must not call get_node()"},
+        {"pattern": "\\bget_parent\\s*\\(", "message": "core must not call get_parent()"},
+        {"pattern": "\\bget_viewport\\s*\\(", "message": "core must not call get_viewport()"},
+        {"pattern": "\\bEngine\\s*\\.\\s*get_main_loop\\s*\\(", "message": "core must not call Engine.get_main_loop()"},
+        {"pattern": "\\$\\s*[\"'A-Za-z_]", "message": "core must not use $NodePath"}
+      ]
+    },
+    {"name": "game", "path": "src/game", "may_depend_on": ["core", "autoload"]},
+    {"name": "ui", "path": "src/ui", "may_depend_on": ["core", "game", "autoload"]},
+    {"name": "autoload", "path": "src/autoload", "may_depend_on": ["core"]}
+  ]
+}

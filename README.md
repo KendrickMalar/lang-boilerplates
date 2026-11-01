@@ -69,6 +69,7 @@ suite を自動導入/自動実行しません。tool や依存は対象・保�
 pnpm test:native:static
 pnpm test:native:quality # 設定の実効検証。既存Clippy/SwiftLint/swift-format/luau-lspのみ使用
 pnpm test:native:rust-game # rust/game・rust/web-game・rust/web。隔離した Rust 1.99.1 と各 tool を使用
+pnpm test:native:blender # Blender のアーキテクチャ強制設定。既存 ruff 0.17.0・Blender 5.2.2 のみ使用
 pnpm test:native:macos
 pnpm test:native:roblox
 NATIVE_IOS_TEST_DESTINATION='platform=iOS Simulator,id=APPROVED-UUID' pnpm test:native:ios
