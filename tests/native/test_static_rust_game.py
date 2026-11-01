@@ -218,5 +218,18 @@ class StaticRustGameTests(unittest.TestCase):
             self.assertIn(text, readme)
 
 
+    def test_commit_runs_coverage(self):
+        script = (REALTIME / "scripts/check.sh").read_text()
+        self.assertIn("commit) stages='format lint deps coverage' ;;", script)
+        self.assertIn("push|all) stages='format lint deps coverage advisories build' ;;", script)
+        for leaf in (REALTIME, ROOM, SOCIAL):
+            with self.subTest(leaf=leaf.name):
+                readme = (leaf / "README.md").read_text()
+                self.assertIn("sh scripts/check.sh commit   # format → lint → deps → coverage", readme)
+                self.assertNotIn("format → lint → deps → test", readme)
+                # Binary-only crates: main() is never run by tests and counts against the floor.
+                self.assertIn("`main.rs` は数行", readme)
+
+
 if __name__ == "__main__":
     unittest.main()

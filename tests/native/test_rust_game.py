@@ -85,10 +85,11 @@ class RealtimeCommitGateTests(RealtimeLeaf):
     def test_clean_workspace_without_dependencies_passes(self):
         result = self.commit(self.project())
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        stages = [f"stage: {name}" for name in ("format", "lint", "deps", "test")]
+        stages = [f"stage: {name}" for name in ("format", "lint", "deps", "coverage")]
         positions = [result.stdout.find(stage) for stage in stages]
         self.assertNotIn(-1, positions, result.stdout)
         self.assertEqual(positions, sorted(positions))
+        self.assertNotIn("stage: test", result.stdout)  # coverage runs the tests once
 
     def test_internal_path_dependency_passes(self):
         # Versionless path deps between the workspace's own crates are not banned wildcards.
@@ -106,7 +107,8 @@ class RealtimeCommitGateTests(RealtimeLeaf):
                              "}\n\n#[cfg(test)]")
         (source / "lib.rs").unlink()
         (source / "main.rs").write_text(main)
-        result = self.commit(root)
+        # The test stage: main() is untested, so the commit coverage floor would reject it first.
+        result = run_game(["sh", "scripts/check.sh", "test"], root)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("doctests: skipped (no library targets)", result.stdout)
 
@@ -204,13 +206,13 @@ pub fn wait() {
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("stage: deps", result.stdout)
         self.assertIn("unused dependency `helper`", result.stdout)
-        self.assertNotIn("stage: test", result.stdout)
+        self.assertNotIn("stage: coverage", result.stdout)
 
     def test_zero_tests_rejected(self):
         lib = CLEAN.split("#[cfg(test)]")[0].rstrip() + "\n"
         result = self.commit(self.project(lib))
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("stage: test", result.stdout)
+        self.assertIn("stage: coverage", result.stdout)
         self.assertIn("no tests to run", result.stderr)
 
     def test_missing_lock_or_tool_rejected(self):
@@ -257,7 +259,7 @@ pub fn greet() {
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("stage: lint", result.stdout)
         self.assertNotIn("stage: deps", result.stdout)
-        self.assertNotIn("stage: test", result.stdout)
+        self.assertNotIn("stage: coverage", result.stdout)
 
 
 UNTESTED = with_items('''
@@ -275,7 +277,7 @@ pub const fn combo(hits: u32) -> u32 {
 ''')
 OFFLINE = "advisory database could not be fetched (network required)"
 COVERAGE = "error: line coverage below 90% (--fail-under-lines 90)"
-PUSH_STAGES = ["format", "lint", "deps", "test", "coverage", "advisories", "build"]
+PUSH_STAGES = ["format", "lint", "deps", "coverage", "advisories", "build"]
 
 
 class RealtimePushGateTests(RealtimeLeaf):
@@ -309,6 +311,23 @@ class RealtimePushGateTests(RealtimeLeaf):
         self.assertNotIn("stage: advisories", result.stdout)
         self.assertIn("1 test run: 1 passed", result.stderr)  # the tests themselves passed
         self.assertIn(COVERAGE, result.stderr)
+
+    def test_commit_rejects_coverage_below_90(self):
+        result = self.push(self.project(UNTESTED), stage="commit")
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("stage: coverage", result.stdout)
+        self.assertIn("1 test run: 1 passed", result.stderr)  # the tests themselves passed
+        self.assertIn(COVERAGE, result.stderr)
+
+    def test_commit_runs_doctests_after_coverage(self):
+        lib = CLEAN.replace("/// Adds two scores without overflowing.\n",
+                            "/// Adds two scores without overflowing.\n///\n/// ```\n"
+                            "/// assert_eq!(core::add(1, 2), 4);\n/// ```\n")
+        result = self.push(self.project(lib), stage="commit")
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("stage: coverage", result.stdout)
+        self.assertIn("Doc-tests", result.stdout + result.stderr)
+        self.assertNotIn(COVERAGE, result.stderr)
 
     def test_failing_test_under_coverage_is_not_a_threshold_miss(self):
         result = self.push(self.project(CLEAN.replace("3);", "4);")), stage="coverage")
@@ -366,7 +385,8 @@ class RealtimePushGateTests(RealtimeLeaf):
 
 class RealtimeRuleTests(RealtimeLeaf):
     def lint(self, items: str) -> subprocess.CompletedProcess[str]:
-        return run_game(["sh", "scripts/check.sh", "commit"], self.project(with_items(items)))
+        # Lint stage only: rule fixtures add untested items that the commit coverage floor rejects.
+        return run_game(["sh", "scripts/check.sh", "lint"], self.project(with_items(items)))
 
     def test_unchecked_add_rejected(self):
         self.assert_rejected(self.lint('''
@@ -506,7 +526,8 @@ class AsyncLockRules:
     """await_holding_lock and the push gate, shared by the room and social leaves."""
 
     def lint(self, items: str) -> subprocess.CompletedProcess[str]:
-        return self.commit(self.project(with_items(items)))
+        # Lint stage only: rule fixtures add untested items that the commit coverage floor rejects.
+        return run_game(["sh", "scripts/check.sh", "lint"], self.project(with_items(items)))
 
     def test_guard_held_across_await_rejected(self):
         self.assert_rejected(self.lint('''
@@ -616,7 +637,7 @@ class RoomAndSocialTests(unittest.TestCase):
                 self.assertEqual(locked.returncode, 0, locked.stderr)
                 result = run_game(["sh", "scripts/check.sh", "commit"], root)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                for stage in ("format", "lint", "deps", "test"):
+                for stage in ("format", "lint", "deps", "coverage"):
                     self.assertIn(f"stage: {stage}", result.stdout)
 
     def assert_banned(self, leaf: str, crate: str):

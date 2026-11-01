@@ -8,9 +8,10 @@ cd "$root"
 stage=$1
 case "$stage" in
     format|lint|deps|test|coverage|advisories|build) stages=$stage ;;
-    commit) stages='format lint deps test' ;;
+    # coverage runs the tests (nextest under llvm-cov) and then the doctests, once.
+    commit) stages='format lint deps coverage' ;;
     # advisories is the only stage that needs network (RustSec advisory DB).
-    push|all) stages='format lint deps test coverage advisories build' ;;
+    push|all) stages='format lint deps coverage advisories build' ;;
     *) fail "unknown stage: $stage" ;;
 esac
 [ -f rust-toolchain.toml ] || fail 'missing rust-toolchain.toml'
@@ -111,6 +112,15 @@ check_member_lints() {
     done
 }
 
+# nextest cannot run doctests; `cargo test --doc` rejects binary-only workspaces.
+run_doctests() {
+    if printf '%s\n' "$metadata" | grep -Eq '"kind":\[[^]]*"(lib|rlib|proc-macro)"'; then
+        "$cargo" test --doc --workspace --locked
+    else
+        printf '%s\n' 'doctests: skipped (no library targets)'
+    fi
+}
+
 # Line coverage floor: change it only here and record why in the product README.
 line_floor=90
 check_coverage() {
@@ -164,14 +174,12 @@ run_stage() {
             ;;
         test)
             "$nextest" nextest run --workspace --locked --no-tests=fail
-            # nextest cannot run doctests; `cargo test --doc` rejects binary-only workspaces.
-            if printf '%s\n' "$metadata" | grep -Eq '"kind":\[[^]]*"(lib|rlib|proc-macro)"'; then
-                "$cargo" test --doc --workspace --locked
-            else
-                printf '%s\n' 'doctests: skipped (no library targets)'
-            fi
+            run_doctests
             ;;
-        coverage) check_coverage ;;
+        coverage)
+            check_coverage
+            run_doctests
+            ;;
         advisories) check_advisories ;;
         build) "$cargo" build --workspace --locked --release ;;
     esac

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cp, mkdir, readFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { ROOT, write, expectResult } from "./helpers.mjs";
 import { createGame3dFixture, browserEnv } from "./game3d-fixture.mjs";
@@ -46,7 +46,8 @@ test(
       );
       await run(["typecheck"], 1, /process/);
       await run(["lint"], 1, /no-unsafe|process/);
-      await write(root, "src/invalid.ts", "export const valid = 1;\n");
+      // An untested product file would fail the 90% coverage gate in later checks.
+      await rm(join(root, "src/invalid.ts"));
     });
     await t.test("E2E runner cannot access DOM directly", async () => {
       await write(
