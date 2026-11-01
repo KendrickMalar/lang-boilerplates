@@ -5,8 +5,8 @@ fail() { printf '%s\n' "error: $*" >&2; exit 1; }
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 stage=${1:-all}
-[ "$#" -le 1 ] || fail 'usage: check.sh [format|lint|settings|test|build|all]'
-case "$stage" in format|lint|settings|test|build|all) ;; *) fail "unknown stage: $stage" ;; esac
+[ "$#" -le 1 ] || fail 'usage: check.sh [format|lint|architecture|settings|test|build|all]'
+case "$stage" in format|lint|architecture|settings|test|build|all) ;; *) fail "unknown stage: $stage" ;; esac
 [ "$(uname -s)" = Darwin ] || fail 'macOS required'
 command -v python3 >/dev/null || fail 'Python >=3.9 required'
 python3 -c 'import sys; assert sys.version_info >= (3, 9), "Python >=3.9 required"'
@@ -23,6 +23,16 @@ if not re.fullmatch(r'platform=iOS Simulator,id=[A-Fa-f0-9-]{36}', os.environ['N
     raise SystemExit('error: requires concrete iOS Simulator destination (platform=iOS Simulator,id=UUID)')
 PYDEST
 export NATIVE_APP_WORK_DIR=${NATIVE_APP_WORK_DIR:-.native-check}
+# Fail closed: a full check without a chosen architecture would silently skip the
+# dependency-direction rules (README アーキテクチャ).
+case "$stage" in
+    all|architecture)
+        case "${NATIVE_APP_ARCHITECTURE:-}" in
+            thin-app-packages|single-target) ;;
+            '') fail 'missing NATIVE_APP_ARCHITECTURE: choose thin-app-packages (default) or single-target per README アーキテクチャ, copy architecture/<option>/check-architecture.sh to scripts/check-architecture.sh, merge architecture/<option>/swiftlint-rules.yml into .swiftlint.yml, and set NATIVE_APP_ARCHITECTURE (thin-app-packages also needs NATIVE_APP_PACKAGE_DIR)' ;;
+            *) fail "unknown architecture: $NATIVE_APP_ARCHITECTURE (thin-app-packages|single-target)" ;;
+        esac ;;
+esac
 python3 - <<'PY'
 import os
 from pathlib import Path
@@ -144,11 +154,24 @@ for target in settings:
 PY
     done
 }
+# Dependency-direction rules for the architecture chosen in the README.
+# The option script is sourced so it reuses fail, the selected tools and this
+# invocation's fresh directory; it never reuses DerivedData from other stages.
+architecture() {
+    case "${NATIVE_APP_ARCHITECTURE:-}" in
+        thin-app-packages|single-target) ;;
+        '') fail 'missing NATIVE_APP_ARCHITECTURE (thin-app-packages|single-target)' ;;
+        *) fail "unknown architecture: $NATIVE_APP_ARCHITECTURE" ;;
+    esac
+    [ -s scripts/check-architecture.sh ] || fail 'missing scripts/check-architecture.sh (copy architecture/<option>/check-architecture.sh)'
+    . ./scripts/check-architecture.sh
+}
 run_stage() {
     printf 'stage: %s\n' "$1"
     case "$1" in
         format) "$formatter" lint --strict --recursive --configuration .swift-format "$NATIVE_APP_SOURCE_DIR" ;;
         lint) "$SWIFTLINT_BIN" lint --strict --no-cache --config .swiftlint.yml "$NATIVE_APP_SOURCE_DIR" ;;
+        architecture) architecture ;;
         settings) settings ;;
         test)
             build_command -configuration Debug -parallel-testing-enabled NO -resultBundlePath "$invocation/tests.xcresult" test
@@ -167,7 +190,7 @@ PY
     esac
 }
 if [ "$stage" = all ]; then
-    for next in format lint settings test build; do run_stage "$next"; done
+    for next in format lint architecture settings test build; do run_stage "$next"; done
 else
     # Direct test/build also require effective quality, not just presence of files.
     case "$stage" in test|build) run_stage settings ;; esac

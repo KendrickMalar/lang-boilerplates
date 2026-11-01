@@ -7,6 +7,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
+from swift_architecture_cases import SingleTargetCases, ThinAppPackagesCases
+
 
 class MacOSSwiftTests(unittest.TestCase):
     fixture: Path | None = None
@@ -139,6 +141,16 @@ class MacOSSwiftTests(unittest.TestCase):
         tool.chmod(0o600)
         with patch.dict(os.environ, {'SWIFTLINT_BIN': str(tool)}):
             self.run_check(success=False, contains='SwiftLint')
+
+
+class MacOSThinAppPackagesTests(ThinAppPackagesCases, unittest.TestCase):
+    platform = 'macos'
+    ui_framework = 'AppKit'
+
+
+class MacOSSingleTargetTests(SingleTargetCases, unittest.TestCase):
+    platform = 'macos'
+    ui_framework = 'AppKit'
 
 
 if __name__ == '__main__':

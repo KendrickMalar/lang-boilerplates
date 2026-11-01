@@ -43,6 +43,9 @@ def swift_env(root: Path) -> dict[str, str]:
         'NATIVE_APP_SOURCE_DIR': 'Sources',
         'NATIVE_APP_DESTINATION': f'platform=macOS,arch={platform.machine()}',
         'NATIVE_APP_VERIFY_UNSIGNED': '1',
+        # Default architecture (README アーキテクチャ); check.sh all fails closed without it.
+        'NATIVE_APP_ARCHITECTURE': 'thin-app-packages',
+        'NATIVE_APP_PACKAGE_DIR': 'Modules',
         'HOME': str(root / 'home'),
         'CFFIXED_USER_HOME': str(root / 'home'),
     }
@@ -65,8 +68,10 @@ def run_swift(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]
     log.write_text(f'cwd={cwd}\ncommand={command!r}\nexit={result.returncode}\n'
                    + result.stdout + '\n' + result.stderr)
     # Hash only fixture inputs, never walk DerivedData/package caches.
-    inputs = [cwd / '.native-app-fixture', cwd / 'Fixture.xcodeproj/project.pbxproj']
-    for directory in ['Config', 'Sources', 'scripts', 'Fixture.xcodeproj/xcshareddata']:
+    inputs = [cwd / '.native-app-fixture', cwd / 'Fixture.xcodeproj/project.pbxproj',
+              cwd / '.swiftlint.yml', cwd / 'Modules/Package.swift']
+    for directory in ['Config', 'Sources', 'scripts', 'Modules/Sources', 'Modules/Tests',
+                      'Fixture.xcodeproj/xcshareddata']:
         inputs.extend((cwd / directory).rglob('*'))
     (logs / f'{stem}.json').write_text(json.dumps({
         'cwd': str(cwd), 'command': command, 'exit': result.returncode, 'log': str(log),
@@ -78,7 +83,8 @@ def run_swift(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]
     return result
 
 
-def copy_swift_fixture(platform: Literal['macos', 'ios']) -> Path:
+def copy_swift_fixture(platform: Literal['macos', 'ios'],
+                       option: Literal['thin-app-packages', 'single-target'] = 'thin-app-packages') -> Path:
     leaf = ROOT / 'swift' / platform
     if not leaf.is_dir():
         raise RuntimeError(f'{platform} leaf absent; do not borrow sibling settings')
@@ -87,6 +93,7 @@ def copy_swift_fixture(platform: Literal['macos', 'ios']) -> Path:
     shutil.copytree(leaf, root, dirs_exist_ok=True)
     (root / '.native-app-fixture').write_text('approved-isolated-fixture\n')
     make_app_project(root, platform)
+    install_architecture(root, option)
     return root
 
 
@@ -169,3 +176,42 @@ def make_app_project(root: Path, platform: Literal['macos', 'ios'], *,
 </Scheme>
 ''')
     return project, 'Fixture'
+
+
+# Architecture fixtures: generated outside the leaf, never distributed.
+ARCH_SOURCES = {
+    'Sources/Core/Item.swift': 'public struct Item: Sendable, Equatable {\n    public let name: String\n\n    public init(name: String) {\n        self.name = name\n    }\n}\n\npublic protocol ItemLoading: Sendable {\n    func load() -> [Item]\n}\n',
+    'Sources/Clients/ItemClient.swift': 'import Core\n\npublic struct ItemClient: ItemLoading {\n    public init() {}\n\n    public func load() -> [Item] {\n        [Item(name: "fixture")]\n    }\n}\n',
+    'Sources/Features/Home/HomeView.swift': 'import Core\nimport SwiftUI\n\npublic struct HomeView: View {\n    let items: [Item]\n\n    public init(items: [Item]) {\n        self.items = items\n    }\n\n    public var body: some View {\n        Text(items.first?.name ?? "")\n    }\n}\n',
+    'Sources/Features/Settings/SettingsView.swift': 'import Core\nimport SwiftUI\n\npublic struct SettingsView: View {\n    public init() {}\n\n    public var body: some View {\n        Text("Settings")\n    }\n}\n',
+    'Tests/CoreTests/ItemTests.swift': 'import Core\nimport XCTest\n\nfinal class ItemTests: XCTestCase {\n    func testName() {\n        XCTAssertEqual(Item(name: "a").name, "a")\n    }\n}\n',
+}
+SINGLE_TARGET_SOURCES = {
+    'Sources/App/Models/Item.swift': 'import Foundation\n\nstruct Item: Identifiable {\n    let id = UUID()\n    let name: String\n}\n',
+    'Sources/App/Services/ItemService.swift': 'import Foundation\n\nstruct ItemService {\n    func load() -> [Item] {\n        [Item(name: "fixture")]\n    }\n}\n',
+    'Sources/App/Views/ItemList.swift': 'import SwiftUI\n\nstruct ItemList: View {\n    let items: [Item]\n\n    var body: some View {\n        List(items) { item in\n            Text(item.name)\n        }\n    }\n}\n',
+}
+
+
+def install_architecture(root: Path, option: Literal['thin-app-packages', 'single-target']) -> None:
+    """Follow the leaf README: copy the option check and merge its SwiftLint rules."""
+    source = root / 'architecture' / option
+    shutil.copy(source / 'check-architecture.sh', root / 'scripts/check-architecture.sh')
+    lint = root / '.swiftlint.yml'
+    lint.write_text(lint.read_text().rstrip('\n') + '\n' + (source / 'swiftlint-rules.yml').read_text())
+    if option == 'thin-app-packages':
+        package = root / 'Modules'
+        package.mkdir()
+        shutil.copy(source / 'Package.swift.example', package / 'Package.swift')
+        for relative, text in ARCH_SOURCES.items():
+            (package / relative).parent.mkdir(parents=True, exist_ok=True)
+            (package / relative).write_text(text)
+    else:
+        for relative, text in SINGLE_TARGET_SOURCES.items():
+            (root / relative).parent.mkdir(parents=True, exist_ok=True)
+            (root / relative).write_text(text)
+
+
+def copy_architecture_fixture(platform: Literal['macos', 'ios'],
+                              option: Literal['thin-app-packages', 'single-target']) -> Path:
+    return copy_swift_fixture(platform, option)
