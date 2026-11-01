@@ -8,7 +8,8 @@ from tests.native.rust_game_helpers import LEAVES, ROOT
 
 FILES = ["README.md", "LICENSE", ".editorconfig", ".gitignore", ".node-version",
          "rust-toolchain.toml", "rustfmt.toml", "clippy.toml", "deny.toml", "Cargo.toml",
-         ".config/nextest.toml", ".cargo/config.toml", "scripts/check.sh", "check-commit.mjs",
+         ".config/nextest.toml", ".cargo/config.toml", "scripts/check.sh",
+         "scripts/check-architecture.sh", "check-commit.mjs",
          "package.json", "pnpm-workspace.yaml", ".husky/pre-commit", ".husky/pre-push"]
 GROUP = {"level": "deny", "priority": -1}
 RESTRICTION = ["unwrap_used", "expect_used", "panic", "todo", "unimplemented", "unreachable",
@@ -249,6 +250,114 @@ class StaticRustGameTests(unittest.TestCase):
                 self.assertNotIn("format → lint → deps → test", readme)
                 # Binary-only crates: main() is never run by tests and counts against the floor.
                 self.assertIn("`main.rs` は数行", readme)
+
+
+# Architecture choices per leaf; the first one is the default.
+CHOICES = {"web": ["hexagonal", "layered", "two-crate"],
+           "web-game": ["hexagonal", "load-mutate-save"],
+           "game": ["sim-room", "ecs", "minimal"]}
+CHOICE_TITLES = {"hexagonal": "軽ヘキサゴナル", "layered": "3層", "two-crate": "2クレート",
+                 "load-mutate-save": "プレイヤー単位の読込・純粋変更・保存",
+                 "sim-room": "純粋 sim＋ルーム actor", "ecs": "ECS の核", "minimal": "最小"}
+
+
+def layers(path: Path) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
+    """architecture/<choice>/layers.conf as ({crate: uses}, {crate: never})."""
+    uses: dict[str, set[str]] = {}
+    never: dict[str, set[str]] = {}
+    for line in path.read_text().splitlines():
+        words = line.split("#", 1)[0].split()
+        if not words:
+            continue
+        crate, key, *names = words
+        {"uses": uses, "never": never}[key].setdefault(crate, set()).update(names)
+    return uses, never
+
+
+class StaticRustArchitectureTests(unittest.TestCase):
+    """README `## アーキテクチャ` and the per-choice enforcement files stay in sync."""
+
+    def section(self, leaf: str, choice: str) -> str:
+        readme = (ROOT / "rust" / leaf / "README.md").read_text()
+        body = readme.split("\n## アーキテクチャ\n", 1)[1].split("\n## ", 1)[0]
+        title = CHOICE_TITLES[choice]
+        default = "（既定）" if CHOICES[leaf][0] == choice else ""
+        head = f"\n### {title}{default}\n"
+        self.assertIn(head, body, f"{leaf}: {head.strip()}")
+        return body.split(head, 1)[1].split("\n### ", 1)[0]
+
+    def test_section_order_and_selection_questions(self):
+        for leaf, choices in CHOICES.items():
+            with self.subTest(leaf=leaf):
+                readme = (ROOT / "rust" / leaf / "README.md").read_text()
+                self.assertIn("\n## アーキテクチャ\n", readme)
+                body = readme.split("\n## アーキテクチャ\n", 1)[1].split("\n## ", 1)[0]
+                heads = re.findall(r"^### (.+)$", body, re.MULTILINE)
+                self.assertEqual(heads[0], "選び方")
+                expected = [CHOICE_TITLES[c] + ("（既定）" if i == 0 else "")
+                            for i, c in enumerate(choices)]
+                self.assertEqual(heads[1:], expected)
+                self.assertIn("scaffold", body.split("\n### ", 1)[0])
+
+    def test_choice_files_are_self_contained_and_parse(self):
+        for leaf, choices in CHOICES.items():
+            base = ROOT / "rust" / leaf / "architecture"
+            with self.subTest(leaf=leaf):
+                self.assertEqual(sorted(p.name for p in base.iterdir()), sorted(choices))
+            for choice in choices:
+                with self.subTest(leaf=leaf, choice=choice):
+                    files = sorted(p.name for p in (base / choice).iterdir())
+                    self.assertEqual(files, ["deny.toml", "layers.conf"])
+                    uses, never = layers(base / choice / "layers.conf")
+                    self.assertTrue(uses)
+                    self.assertLessEqual(set(never), set(uses), "never for an unlisted crate")
+                    for crate, deps in uses.items():
+                        self.assertLessEqual(deps, set(uses), f"{crate} uses an unlisted crate")
+                        self.assertNotIn(crate, deps)
+                    bans = toml(base / choice, "deny.toml")["bans"]
+                    self.assertEqual(bans["multiple-versions"], "allow")
+                    self.assertEqual(bans["wildcards"], "allow")
+                    self.assertTrue(bans["deny"])
+                    for entry in bans["deny"]:
+                        self.assertTrue(entry["wrappers"], entry["crate"])
+                        self.assertLessEqual(set(entry["wrappers"]), set(uses), entry["crate"])
+                        self.assertNotIn(entry["crate"], uses, "workspace crates go in layers.conf")
+                        self.assertTrue(entry.get("reason"), entry["crate"])
+
+    def test_readme_matches_choice_files(self):
+        for leaf, choices in CHOICES.items():
+            for choice in choices:
+                with self.subTest(leaf=leaf, choice=choice):
+                    text = self.section(leaf, choice)
+                    for name in ("layers.conf", "deny.toml"):
+                        self.assertIn(f"](architecture/{choice}/{name})", text)
+                    self.assertIn("MUST NOT", text)
+                    self.assertIn("向く", text)
+                    self.assertIn("向かない", text)
+                    mermaid = re.findall(r"```mermaid\n(.*?)```", text, re.DOTALL)
+                    self.assertEqual(len(mermaid), 1)
+                    self.assertTrue(mermaid[0].startswith("flowchart"))
+                    edges = set(re.findall(r"^\s*([\w-]+) --> ([\w-]+)\s*$", mermaid[0],
+                                           re.MULTILINE))
+                    uses, _ = layers(ROOT / "rust" / leaf / "architecture" / choice / "layers.conf")
+                    expected = {(crate, dep) for crate, deps in uses.items() for dep in deps}
+                    self.assertEqual(edges, expected, "mermaid arrows = layers.conf uses")
+                    for crate in uses:
+                        self.assertIn(f"`{crate}`", text)
+
+    def test_check_runs_architecture_in_deps_stage(self):
+        for leaf in CHOICES:
+            with self.subTest(leaf=leaf):
+                script = (ROOT / "rust" / leaf / "scripts/check.sh").read_text()
+                self.assertIn('            "$deny" deny --offline check bans licenses sources\n'
+                              '            sh scripts/check-architecture.sh "$deny"\n', script)
+                arch = (ROOT / "rust" / leaf / "scripts/check-architecture.sh").read_text()
+                self.assertIn("architecture/layers.conf", arch)
+                self.assertIn('--config "$bans" check bans', arch)
+                self.assertIn("--no-dedupe", arch)
+                readme = (ROOT / "rust" / leaf / "README.md").read_text()
+                self.assertIn("[scripts/check-architecture.sh](scripts/check-architecture.sh)",
+                              readme)
 
 
 if __name__ == "__main__":
