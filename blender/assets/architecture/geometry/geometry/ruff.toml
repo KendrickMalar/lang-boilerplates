@@ -1,0 +1,11 @@
+# geometry/: pure shape math testable without Blender. Inherits the parts/ rules
+# (models banned, relative imports banned) and also bans Blender modules and parts.
+extend = "../parts/ruff.toml"
+
+[lint.flake8-tidy-imports.extend-banned-api]
+"bpy".msg = "geometry/ must not use Blender; convert in parts/"
+"bmesh".msg = "geometry/ must not use Blender; convert in parts/"
+"mathutils".msg = "geometry/ must not use Blender; use plain tuples"
+"bpy_extras".msg = "geometry/ must not use Blender; convert in parts/"
+"gpu".msg = "geometry/ must not use Blender; convert in parts/"
+"parts".msg = "geometry/ must not import parts/; dependencies point from parts to geometry"

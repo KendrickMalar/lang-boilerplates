@@ -14,6 +14,7 @@
     "test": "node --version && pnpm test:static && pnpm test:integration",
     "test:native:quality": "python3 -m tests.native.test_catalog tests.native.test_quality_settings",
     "test:native:static": "python3 -m tests.native.test_catalog tests.native.test_catalog tests.native.test_static_rust_game tests.native.test_static_swift tests.native.test_static_roblox tests.native.test_static_godot tests.native.test_static_blender tests.native.test_hooks.HookContractTests",
+    "test:native:blender": "python3 -m tests.native.test_catalog tests.native.test_blender_architecture",
     "test:native:rust-game": "python3 -m tests.native.test_catalog tests.native.test_rust_game_env tests.native.test_rust_game",
     "test:native:macos": "PYTHONPATH=tests/native python3 -m tests.native.test_catalog tests.native.test_swift_macos tests.native.test_hooks.MacOSHookTests",
     "test:native:roblox": "python3 -m tests.native.test_catalog tests.native.test_catalog tests.native.test_static_roblox tests.native.test_roblox tests.native.test_luau_similarity tests.native.test_hooks.RobloxHookTests tests.native.test_hooks.HookContractTests",

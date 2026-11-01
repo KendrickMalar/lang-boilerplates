@@ -32,7 +32,9 @@ class StaticBlenderTests(unittest.TestCase):
         ruff = config["tool"]["ruff"]
         self.assertEqual(ruff["target-version"], "py313")
         self.assertEqual(ruff["line-length"], 100)
-        self.assertEqual(ruff["lint"]["select"], ["E", "F", "W", "I", "B", "UP"])
+        self.assertEqual(ruff["src"], ["."])
+        self.assertEqual(ruff["extend-exclude"], ["architecture"])
+        self.assertEqual(ruff["lint"]["select"], ["E", "F", "W", "I", "B", "UP", "TID"])
 
     def test_triangle_budget_default(self):
         text = (LEAF / "scripts/build.py").read_text()
@@ -62,6 +64,44 @@ class StaticBlenderTests(unittest.TestCase):
                 self.assertTrue((LEAF / link).exists(), link)
         for phrase in ["MAX_TRIANGLES", "build()", "--python-exit-code", "godot/mobile-game", "未検証"]:
             self.assertIn(phrase, text)
+
+    def test_architecture_configs_enforce_dependency_direction(self):
+        arch = LEAF / "architecture"
+        self.assertEqual(sorted(p.relative_to(arch).as_posix() for p in arch.rglob("*") if p.is_file()),
+                         ["flat/models/ruff.toml", "flat/parts/ruff.toml",
+                          "geometry/geometry/ruff.toml", "geometry/models/ruff.toml",
+                          "geometry/parts/ruff.toml"])
+        for option in ["flat", "geometry"]:
+            for layer in ["models", "parts"]:
+                with self.subTest(option=option, layer=layer):
+                    config = tomllib.loads((arch / option / layer / "ruff.toml").read_text())
+                    self.assertEqual(config["extend"], "../pyproject.toml")
+                    tidy = config["lint"]["flake8-tidy-imports"]
+                    self.assertEqual(tidy["ban-relative-imports"], "all")
+                    self.assertEqual(set(tidy["banned-api"]), {"models"})
+        geometry = tomllib.loads((arch / "geometry/geometry/ruff.toml").read_text())
+        self.assertEqual(geometry["extend"], "../parts/ruff.toml")
+        banned = set(geometry["lint"]["flake8-tidy-imports"]["extend-banned-api"])
+        self.assertEqual(banned, {"bpy", "bmesh", "mathutils", "bpy_extras", "gpu", "parts"})
+
+    def test_lint_covers_architecture_layers_and_build_imports_them(self):
+        check = (LEAF / "scripts/check.sh").read_text()
+        self.assertIn("for dir in models parts geometry tests scripts", check)
+        self.assertIn('ruff format --check $(lint_targets)', check)
+        self.assertIn('ruff check $(lint_targets)', check)
+        self.assertIn("sys.path.insert(0, str(ROOT))", (LEAF / "scripts/build.py").read_text())
+
+    def test_architecture_section_shape(self):
+        text = (LEAF / "README.md").read_text()
+        section = text[text.index("## アーキテクチャ\n"):]
+        section = section[:section.index("\n## ", 1)]
+        headings = re.findall(r"^### (.+)$", section, re.M)
+        self.assertEqual(headings, ["選び方", "フラット＋共通部品（既定）", "純粋な形状計算＋bpy の変換役",
+                                    "検出できないもの"])
+        self.assertEqual(section.count("```mermaid"), 2)
+        for phrase in ["MUST NOT", "architecture/flat/", "architecture/geometry/",
+                       'importlib.import_module("bpy")', "TID251", "TID252", "scaffold"]:
+            self.assertIn(phrase, section)
 
 
 if __name__ == "__main__":

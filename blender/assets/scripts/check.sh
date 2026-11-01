@@ -32,11 +32,18 @@ run_blender() {
     blender -b --factory-startup --python-exit-code 1 --python "$script" -- "$@"
 }
 
+# Architecture layers (README「アーキテクチャ」) are linted only when present.
+lint_targets() {
+    for dir in models parts geometry tests scripts; do
+        if [ -d "$dir" ]; then printf '%s\n' "$dir"; fi
+    done
+}
+
 run_stage() {
     printf '%s\n' "stage: $1"
     case "$1" in
-        format) ruff format --check models tests scripts ;;
-        lint) ruff check models tests scripts ;;
+        format) ruff format --check $(lint_targets) ;;
+        lint) ruff check $(lint_targets) ;;
         test) run_blender scripts/test.py || fail 'tests failed' ;;
         build)
             out=$(mktemp -d)
