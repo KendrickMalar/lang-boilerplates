@@ -28,7 +28,7 @@ deny = [
     { crate = "poem", reason = "no release since 2025-07; use axum" },
     { crate = "openssl", reason = "TLS is limited to rustls" },
     { crate = "openssl-sys", reason = "TLS is limited to rustls" },
-    { crate = "actix", reason = "no stable release since 2024; use tokio tasks and channels" },
+    { crate = "native-tls", reason = "TLS is limited to rustls" },
 ]
 
 [sources]

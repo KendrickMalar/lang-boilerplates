@@ -18,6 +18,10 @@ esac
 grep -Eq '^channel = "1\.99\.1"$' rust-toolchain.toml || fail 'requires pinned Rust 1.99.1'
 RUSTUP_AUTO_INSTALL=0
 export RUSTUP_AUTO_INSTALL
+# sqlx macros check queries against .sqlx/ (cargo sqlx prepare), not a live database.
+SQLX_OFFLINE=${SQLX_OFFLINE:-true}
+export SQLX_OFFLINE
+printf '%s\n' "env: SQLX_OFFLINE=$SQLX_OFFLINE"
 command -v rustup >/dev/null 2>&1 || fail 'rustup must already be installed; no automatic installation'
 rustup_version=$(rustup --version) || fail 'cannot read rustup version'
 printf '%s\n' "$rustup_version"

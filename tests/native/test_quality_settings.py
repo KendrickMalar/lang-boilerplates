@@ -44,21 +44,25 @@ class RustQualityTests(unittest.TestCase):
                                 text=True, capture_output=True, check=False)
         self.assertEqual(lookup.returncode, 0, lookup.stderr)
         cargo = Path(lookup.stdout.strip())
+        # The leaf denies print_stdout, so the fixtures keep values alive with black_box.
         cases = [
-            ("redundant_clone", 'let name = String::from("hello"); let copy = name.clone(); println!("{copy}");',
-             'let name = String::from("hello"); let copy = name; println!("{copy}");'),
-            ("assigning_clones", 'let mut target = String::new(); println!("{target}"); let source = String::from("hello"); target = source.clone(); println!("{target}");',
-             'let mut target = String::new(); println!("{target}"); let source = String::from("hello"); target.clone_from(&source); println!("{target}");'),
-            ("or_fun_call", 'let value: Option<String> = std::env::args().nth(1); let text = value.unwrap_or(String::from("fallback")); println!("{text}");',
-             'let value: Option<String> = std::env::args().nth(1); let text = value.unwrap_or_else(|| String::from("fallback")); println!("{text}");'),
+            ("redundant_clone", 'let name = String::from("hello"); let copy = name.clone(); std::hint::black_box(copy);',
+             'let name = String::from("hello"); let copy = name; std::hint::black_box(copy);'),
+            ("assigning_clones", 'let mut target = String::new(); std::hint::black_box(&target); let source = String::from("hello"); target = source.clone(); std::hint::black_box(target);',
+             'let mut target = String::new(); std::hint::black_box(&target); let source = String::from("hello"); target.clone_from(&source); std::hint::black_box(target);'),
+            ("or_fun_call", 'let value: Option<String> = std::env::args().nth(1); let text = value.unwrap_or(String::from("fallback")); std::hint::black_box(text);',
+             'let value: Option<String> = std::env::args().nth(1); let text = value.unwrap_or_else(|| String::from("fallback")); std::hint::black_box(text);'),
         ]
-        settings = (ROOT / "rust/tauri/src-tauri/Cargo.toml").read_text()
-        lint_tables = settings[settings.index("[lints.rust]"):]
+        # The rust/web leaf has no leaf-specific lints that these fixtures would trip; its
+        # [workspace.lints.*] tables become the single package's [lints.*] tables.
+        settings = (ROOT / "rust/web/Cargo.toml").read_text()
+        lint_tables = settings[settings.index("[workspace.lints.rust]"):settings.index("[profile.release]")]
+        lint_tables = lint_tables.replace("[workspace.lints.", "[lints.")
         for rule, bad, good in cases:
             with self.subTest(rule=rule):
                 root = fixture(rule)
                 (root / "src").mkdir()
-                (root / "Cargo.toml").write_text('[package]\nname="quality-fixture"\nversion="0.1.0"\nedition="2024"\n' + lint_tables)
+                (root / "Cargo.toml").write_text('[package]\nname="quality-fixture"\nversion="0.1.0"\nedition="2024"\npublish=false\n\n' + lint_tables)
                 env = {"PATH": str(cargo.parent) + os.pathsep + os.environ["PATH"],
                        "CARGO_HOME": str(root / "cargo"), "CARGO_TARGET_DIR": str(root / "target"),
                        "RUSTC": str(cargo.parent / "rustc"), "RUSTUP_AUTO_INSTALL": "0", "CARGO_NET_OFFLINE": "true"}
@@ -66,11 +70,11 @@ class RustQualityTests(unittest.TestCase):
                 self.assertEqual(version.returncode, 0, version.stderr)
                 self.assertIn("rustc 1.92.0 ", version.stdout)
                 command = [str(cargo), "clippy", "--offline", "--all-targets", "--", "-D", "warnings"]
-                (root / "src/main.rs").write_text("fn main() { " + bad + " }\n")
+                (root / "src/main.rs").write_text("//! Fixture.\nfn main() { " + bad + " }\n")
                 rejected = run(command, root, env=env)
                 self.assertNotEqual(rejected.returncode, 0, rejected.stdout + rejected.stderr)
                 self.assertIn(rule, rejected.stderr)
-                (root / "src/main.rs").write_text("fn main() { " + good + " }\n")
+                (root / "src/main.rs").write_text("//! Fixture.\nfn main() { " + good + " }\n")
                 accepted = run(command, root, env=env)
                 self.assertEqual(accepted.returncode, 0, accepted.stdout + accepted.stderr)
 
@@ -148,7 +152,7 @@ class LuauQualityTests(unittest.TestCase):
         tool = Path.home() / ".rokit/tool-storage/johnnymorganz/luau-lsp/1.69.0/luau-lsp"
         self.assertTrue(tool.is_file(), "existing luau-lsp 1.69.0 required; do not install")
         root = fixture("luau")
-        shutil.copy2(ROOT / "roblox/rojo/.luaurc", root / ".luaurc")
+        shutil.copy2(ROOT / "roblox/roblox-game/.luaurc", root / ".luaurc")
         version = run([str(tool), "--version"], root)
         self.assertEqual(version.returncode, 0, version.stderr)
         self.assertIn("1.69.0", version.stdout)

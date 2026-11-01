@@ -41,7 +41,7 @@ mem_forget = "deny"
 string_slice = "deny"
 rc_mutex = "deny"
 lossy_float_literal = "deny"
-# Same three individually selected lints as the Tauri leaf.
+# Three more individually selected lints (needless clones and eager allocation).
 redundant_clone = "deny"
 assigning_clones = "deny"
 or_fun_call = "deny"

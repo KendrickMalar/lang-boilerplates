@@ -1,4 +1,0 @@
-# Resolve compatible dependencies when the consumer generates its Cargo.lock.
-# No global paths, target overrides, automatic fixes, or release tuning.
-[resolver]
-incompatible-rust-versions = "fallback"

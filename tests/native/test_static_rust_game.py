@@ -1,4 +1,4 @@
-"""Catch missing, non-self-contained, or weakened Rust game-server quality settings."""
+"""Catch missing, non-self-contained, or weakened Rust server quality settings."""
 import re
 import tomllib
 import unittest
@@ -6,7 +6,6 @@ from pathlib import Path
 
 from tests.native.rust_game_helpers import LEAVES, ROOT
 
-TAURI = ROOT / "rust/tauri"
 FILES = ["README.md", "LICENSE", ".editorconfig", ".gitignore", ".node-version",
          "rust-toolchain.toml", "rustfmt.toml", "clippy.toml", "deny.toml", "Cargo.toml",
          ".config/nextest.toml", ".cargo/config.toml", "scripts/check.sh", "check-commit.mjs",
@@ -17,20 +16,24 @@ RESTRICTION = ["unwrap_used", "expect_used", "panic", "todo", "unimplemented", "
                "allow_attributes", "allow_attributes_without_reason",
                "undocumented_unsafe_blocks", "mem_forget", "string_slice", "rc_mutex",
                "lossy_float_literal"]
-TAURI_LINTS = ["redundant_clone", "assigning_clones", "or_fun_call"]
+CLONE_LINTS = ["redundant_clone", "assigning_clones", "or_fun_call"]
 LICENSES = {"MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-3.0", "Zlib"}
 BANNED = {"bincode", "fred", "poem", "openssl", "openssl-sys"}
 REALTIME_LINTS = ["arithmetic_side_effects", "cast_possible_truncation", "cast_sign_loss",
                   "cast_precision_loss", "cast_possible_wrap", "cast_lossless", "as_conversions",
                   "indexing_slicing", "float_cmp"]
-REALTIME = ROOT / "rust/game-realtime"
-ROOM = ROOT / "rust/game-room"
-SOCIAL = ROOT / "rust/game-social"
-# Files that differ per leaf; every other file is byte-identical to the realtime leaf.
+GAME = ROOT / "rust/game"
+WEB_GAME = ROOT / "rust/web-game"
+WEB = ROOT / "rust/web"
+# Files that differ per leaf; every other file is byte-identical to the game leaf.
 # package.json differs only in its "name".
 PER_LEAF = {"README.md", "Cargo.toml", "clippy.toml", "deny.toml", "scripts/check.sh",
             "package.json"}
-REALTIME_ONLY_METHODS = {"std::time::SystemTime::now", "std::time::Instant::now"}
+GAME_ONLY_METHODS = {"std::time::SystemTime::now", "std::time::Instant::now"}
+ROOM_LINTS = ["await_holding_lock", "await_holding_refcell_ref", "await_holding_invalid_type",
+              "large_futures"]
+ROOM_METHODS = {"tokio::sync::mpsc::unbounded_channel", "futures::channel::mpsc::unbounded"}
+API_METHODS = {"sqlx::query", "sqlx::query_as", "reqwest::Client::new", "reqwest::get"}
 
 
 def toml(leaf: Path, name: str) -> dict:
@@ -52,7 +55,7 @@ class StaticRustGameTests(unittest.TestCase):
                 for file in FILES:
                     if file not in PER_LEAF:
                         self.assertEqual((leaf / file).read_bytes(),
-                                         (REALTIME / file).read_bytes(), f"{name}: {file}")
+                                         (GAME / file).read_bytes(), f"{name}: {file}")
 
     def check_common(self, leaf: Path):
         toolchain = toml(leaf, "rust-toolchain.toml")["toolchain"]
@@ -78,7 +81,7 @@ class StaticRustGameTests(unittest.TestCase):
         clippy = workspace["lints"]["clippy"]
         for group in ["all", "pedantic", "nursery", "cargo"]:
             self.assertEqual(clippy[group], GROUP, group)
-        for lint in RESTRICTION + TAURI_LINTS:
+        for lint in RESTRICTION + CLONE_LINTS:
             self.assertEqual(clippy.get(lint), "deny", lint)
 
         release = manifest["profile"]["release"]
@@ -104,9 +107,12 @@ class StaticRustGameTests(unittest.TestCase):
         self.assertEqual(deny["sources"]["unknown-registry"], "deny")
         self.assertEqual(deny["sources"]["unknown-git"], "deny")
 
-        self.assertEqual(toml(leaf, "rustfmt.toml"), toml(TAURI, "rustfmt.toml"))
+        self.assertEqual(toml(leaf, "rustfmt.toml"),
+                         {"edition": "2024", "max_width": 100, "tab_spaces": 4, "hard_tabs": False,
+                          "newline_style": "Unix", "reorder_imports": True})
+        # Every native leaf shares one commit gate.
         self.assertEqual((leaf / "check-commit.mjs").read_bytes(),
-                         (TAURI / "check-commit.mjs").read_bytes())
+                         (ROOT / "swift/macos/check-commit.mjs").read_bytes())
 
         self.assertEqual(list(leaf.rglob("*.rs")), [], "no Rust source is distributed")
         self.assertEqual(list(leaf.rglob("Cargo.lock")), [], "no Cargo.lock is distributed")
@@ -115,26 +121,36 @@ class StaticRustGameTests(unittest.TestCase):
                 self.assertTrue((leaf / link).exists(), link)
                 self.assertTrue((leaf / link).resolve().is_relative_to(leaf.resolve()), link)
 
-    def test_realtime_rules(self):
-        manifest = toml(REALTIME, "Cargo.toml")
+    def test_game_rules(self):
+        # Deterministic simulation (former game-realtime) plus async rooms (former game-room).
+        manifest = toml(GAME, "Cargo.toml")
         clippy = manifest["workspace"]["lints"]["clippy"]
-        for lint in REALTIME_LINTS:
+        for lint in REALTIME_LINTS + ROOM_LINTS:
             self.assertEqual(clippy.get(lint), "deny", lint)
         self.assertNotIn("float_arithmetic", clippy, "games need float arithmetic")
         release = manifest["profile"]["release"]
         self.assertEqual(release["lto"], "fat")
         self.assertEqual(release["codegen-units"], 1)
 
-        clippy_conf = toml(REALTIME, "clippy.toml")
-        self.assertLessEqual({"std::time::SystemTime::now", "std::time::Instant::now"},
-                             disallowed(clippy_conf["disallowed-methods"]))
+        clippy_conf = toml(GAME, "clippy.toml")
+        self.assertEqual(disallowed(clippy_conf["disallowed-methods"]),
+                         {"std::thread::sleep", "std::process::exit"} | GAME_ONLY_METHODS
+                         | ROOM_METHODS)
+        for entry in clippy_conf["disallowed-methods"]:
+            if entry["path"] in ROOM_METHODS:
+                self.assertIs(entry.get("allow-invalid"), True, entry["path"])
         self.assertLessEqual({"std::hash::RandomState", "std::collections::hash_map::RandomState",
                               "std::collections::HashMap", "std::collections::HashSet"},
                              disallowed(clippy_conf["disallowed-types"]))
 
-        banned = {entry if isinstance(entry, str) else entry["crate"]
-                  for entry in toml(REALTIME, "deny.toml")["bans"]["deny"]}
-        self.assertIn("laminar", banned)
+        banned = self.banned(GAME)
+        self.assertLessEqual({"laminar", "actix"}, banned)
+        self.assertNotIn("native-tls", banned)
+        self.assertNotIn("SQLX_OFFLINE", (GAME / "scripts/check.sh").read_text())
+        readme = (GAME / "README.md").read_text()
+        for text in ["リアルタイム対戦", "ルーム制", "WebSocket", "tick", "RandomState", "JoinSet",
+                     "unbounded_channel", "actix"]:
+            self.assertIn(text, readme)
 
     def check_async_leaf(self, leaf: Path, lints: list[str], methods: set[str], ban: str):
         manifest = toml(leaf, "Cargo.toml")
@@ -142,7 +158,7 @@ class StaticRustGameTests(unittest.TestCase):
         for lint in lints:
             self.assertEqual(clippy.get(lint), "deny", lint)
         for lint in REALTIME_LINTS:
-            self.assertNotIn(lint, clippy, f"realtime-only lint: {lint}")
+            self.assertNotIn(lint, clippy, f"game-only lint: {lint}")
         self.assertNotIn("float_arithmetic", clippy)
         release = manifest["profile"]["release"]
         self.assertNotIn("lto", release)
@@ -151,7 +167,7 @@ class StaticRustGameTests(unittest.TestCase):
         clippy_conf = toml(leaf, "clippy.toml")
         self.assertEqual(disallowed(clippy_conf["disallowed-methods"]),
                          {"std::thread::sleep", "std::process::exit"} | methods)
-        self.assertFalse(REALTIME_ONLY_METHODS & disallowed(clippy_conf["disallowed-methods"]))
+        self.assertFalse(GAME_ONLY_METHODS & disallowed(clippy_conf["disallowed-methods"]))
         self.assertNotIn("disallowed-types", clippy_conf)
         for entry in clippy_conf["disallowed-methods"]:
             if entry["path"] in methods:
@@ -162,47 +178,51 @@ class StaticRustGameTests(unittest.TestCase):
         self.assertNotIn("laminar", banned)
         readme = (leaf / "README.md").read_text()
         for text in ["tick", "RandomState", "laminar", "fat"]:
-            self.assertNotIn(text, readme, f"realtime-only README text: {text}")
+            self.assertNotIn(text, readme, f"game-only README text: {text}")
 
     @staticmethod
     def banned(leaf: Path) -> set[str]:
         return {entry["crate"] for entry in toml(leaf, "deny.toml")["bans"]["deny"]}
 
-    def test_room_rules(self):
-        self.check_async_leaf(
-            ROOM,
-            ["await_holding_lock", "await_holding_refcell_ref", "await_holding_invalid_type",
-             "large_futures"],
-            {"tokio::sync::mpsc::unbounded_channel", "futures::channel::mpsc::unbounded"},
-            "actix")
-        self.assertNotIn("SQLX_OFFLINE", (ROOM / "scripts/check.sh").read_text())
-        self.assertNotIn("native-tls", self.banned(ROOM))
-
-    def test_social_rules(self):
-        self.check_async_leaf(
-            SOCIAL, ["await_holding_lock", "await_holding_refcell_ref"],
-            {"sqlx::query", "sqlx::query_as", "reqwest::Client::new", "reqwest::get"}, "native-tls")
-        self.assertNotIn("actix", self.banned(SOCIAL))
-        clippy = toml(SOCIAL, "Cargo.toml")["workspace"]["lints"]["clippy"]
+    def check_api_leaf(self, leaf: Path):
+        self.check_async_leaf(leaf, ["await_holding_lock", "await_holding_refcell_ref"],
+                              API_METHODS, "native-tls")
+        self.assertNotIn("actix", self.banned(leaf))
+        clippy = toml(leaf, "Cargo.toml")["workspace"]["lints"]["clippy"]
         self.assertNotIn("await_holding_invalid_type", clippy)
         self.assertNotIn("large_futures", clippy)
-        script = (SOCIAL / "scripts/check.sh").read_text()
+        script = (leaf / "scripts/check.sh").read_text()
         self.assertIn("SQLX_OFFLINE=${SQLX_OFFLINE:-true}\nexport SQLX_OFFLINE\n", script)
-        readme = (SOCIAL / "README.md").read_text()
+        readme = (leaf / "README.md").read_text()
         for text in ["cargo sqlx prepare", ".sqlx/", "SQLX_OFFLINE=true"]:
             self.assertIn(text, readme)
 
-    def test_push_stages_identical_in_all_leaves(self):
-        # Shared check.sh logic is the realtime script except for the social SQLX lines.
-        realtime = (REALTIME / "scripts/check.sh").read_text()
-        self.assertEqual((ROOM / "scripts/check.sh").read_text(), realtime)
-        social = (SOCIAL / "scripts/check.sh").read_text()
-        kept = [line for line in social.splitlines(keepends=True)
-                if "SQLX" not in line and "sqlx macros check" not in line]
-        self.assertEqual("".join(kept), realtime)
+    def test_web_game_rules(self):
+        self.check_api_leaf(WEB_GAME)
+        self.assertIn("ソシャゲ", (WEB_GAME / "README.md").read_text())
 
-    def test_realtime_push_stages(self):
-        script = (REALTIME / "scripts/check.sh").read_text()
+    def test_web_rules(self):
+        # The generic HTTP API leaf keeps every API rule of web-game; only the README differs.
+        self.check_api_leaf(WEB)
+        for file in ["Cargo.toml", "clippy.toml", "deny.toml", "scripts/check.sh"]:
+            self.assertEqual((WEB / file).read_bytes(), (WEB_GAME / file).read_bytes(), file)
+        readme = (WEB / "README.md").read_text()
+        for text in ["ソシャゲ型 API", "ランキング", "ガチャ", "マスターデータ"]:
+            self.assertNotIn(text, readme, f"web-game-only README text: {text}")
+        self.assertIn("HTTP API", readme)
+
+    def test_push_stages_identical_in_all_leaves(self):
+        # Shared check.sh logic is the game script except for the API leaves' SQLX lines.
+        game = (GAME / "scripts/check.sh").read_text()
+        for leaf in (WEB_GAME, WEB):
+            with self.subTest(leaf=leaf.name):
+                api = (leaf / "scripts/check.sh").read_text()
+                kept = [line for line in api.splitlines(keepends=True)
+                        if "SQLX" not in line and "sqlx macros check" not in line]
+                self.assertEqual("".join(kept), game)
+
+    def test_game_push_stages(self):
+        script = (GAME / "scripts/check.sh").read_text()
         for command in [
             'llvm-cov nextest --workspace --locked --no-tests=fail --fail-under-lines "$line_floor"',
             "line_floor=90\n",
@@ -211,7 +231,7 @@ class StaticRustGameTests(unittest.TestCase):
         ]:
             self.assertTrue(command in script, command)
         self.assertIn("advisory database could not be fetched (network required)", script)
-        readme = (REALTIME / "README.md").read_text()
+        readme = (GAME / "README.md").read_text()
         for text in ["`line_floor=90`", "line coverage below 90% (--fail-under-lines 90)",
                      "https://github.com/rustsec/advisory-db",
                      "sh scripts/check.sh push", "cargo-llvm-cov | 0.9.1"]:
@@ -219,10 +239,10 @@ class StaticRustGameTests(unittest.TestCase):
 
 
     def test_commit_runs_coverage(self):
-        script = (REALTIME / "scripts/check.sh").read_text()
+        script = (GAME / "scripts/check.sh").read_text()
         self.assertIn("commit) stages='format lint deps coverage' ;;", script)
         self.assertIn("push|all) stages='format lint deps coverage advisories build' ;;", script)
-        for leaf in (REALTIME, ROOM, SOCIAL):
+        for leaf in (GAME, WEB_GAME, WEB):
             with self.subTest(leaf=leaf.name):
                 readme = (leaf / "README.md").read_text()
                 self.assertIn("sh scripts/check.sh commit   # format → lint → deps → coverage", readme)

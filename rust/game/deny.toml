@@ -29,6 +29,7 @@ deny = [
     { crate = "openssl", reason = "TLS is limited to rustls" },
     { crate = "openssl-sys", reason = "TLS is limited to rustls" },
     { crate = "laminar", reason = "no release since 2021; use quinn or renet2" },
+    { crate = "actix", reason = "no stable release since 2024; use tokio tasks and channels" },
 ]
 
 [sources]

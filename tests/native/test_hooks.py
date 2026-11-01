@@ -58,7 +58,7 @@ def install_husky_dependencies(root, env):
 class HookContractTests(unittest.TestCase):
     def test_hooks_executable_and_empty_project_fails_without_install(self):
         CACHE.mkdir(parents=True, exist_ok=True)
-        for leaf in ['rust/tauri', 'swift/macos', 'swift/ios', 'roblox/rojo']:
+        for leaf in ['swift/macos', 'swift/ios', 'roblox/roblox-game']:
             for hook in ['pre-commit', 'pre-push']:
                 with self.subTest(leaf=leaf, hook=hook):
                     source = ROOT / leaf / '.husky' / hook
@@ -74,7 +74,7 @@ class HookContractTests(unittest.TestCase):
                     self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_documented_opt_in_preserves_existing_hooks(self):
-        for leaf in ['rust/tauri', 'swift/macos', 'swift/ios', 'roblox/rojo']:
+        for leaf in ['swift/macos', 'swift/ios', 'roblox/roblox-game']:
             text = (ROOT / leaf / 'README.md').read_text()
             for command in ['git config --show-origin --get-all core.hooksPath',
                             'git rev-parse --git-path hooks',
@@ -90,7 +90,7 @@ class HookContractTests(unittest.TestCase):
         for ref in ['not-a-commit', '0' * 40]:
             with self.subTest(ref=ref), patch.dict(os.environ, {'NATIVE_HOOK_CHECK_REF': ref}):
                 with self.assertRaises((RuntimeError, subprocess.CalledProcessError)):
-                    copy_check_script('rust/tauri', sandbox)
+                    copy_check_script('swift/macos', sandbox)
         self.assertFalse((sandbox / 'scripts/check.sh').exists())
 
 
@@ -116,7 +116,6 @@ def exercise_git_gates(test: unittest.TestCase, platform: str, inputs):
         'test_sha256': hashlib.sha256(test_source.read_bytes()).hexdigest(),
         'check_sha256': hashlib.sha256((root / 'scripts/check.sh').read_bytes()).hexdigest(),
         'selected_ref': os.environ.get('NATIVE_HOOK_CHECK_REF', 'working-tree'),
-        'lock_sha256': hashlib.sha256((root / 'src-tauri/Cargo.lock').read_bytes()).hexdigest() if platform == 'rust' else None,
         'target': env.get('CARGO_TARGET_DIR'),
         'destination': env.get('NATIVE_APP_DESTINATION')}, indent=2))
     receipts = []
@@ -166,9 +165,7 @@ def exercise_git_gates(test: unittest.TestCase, platform: str, inputs):
         output = receipts[-1]['stdout'] + receipts[-1]['stderr']
         for stage in ['format', 'lint', 'test', 'build']:
             test.assertIn('stage: ' + stage, output)
-        if platform == 'rust':
-            test.assertIn('1 passed', output)
-        elif platform == 'roblox':
+        if platform == 'roblox':
             test.assertIn('1 passed, 0 failed', output)
         else:
             test.assertRegex(output, r'"passedTests"\s*:\s*1')
@@ -189,7 +186,7 @@ def exercise_git_gates(test: unittest.TestCase, platform: str, inputs):
         run(['add', '--', str(test_source.relative_to(root))])
         run(['commit', '-qm', 'formatted failing test'], success=False)
         output = receipts[-1]['stdout'] + receipts[-1]['stderr']
-        test.assertIn({'rust': 'test result: FAILED', 'roblox': 'FAIL tests/Greeting.spec.luau'}
+        test.assertIn({'roblox': 'FAIL tests/Greeting.spec.luau'}
                       .get(platform, 'FixtureTests.testAddition()'), output)
         test.assertEqual(run(['rev-parse', 'HEAD']), head)
         run(['push', str(remote), 'HEAD:refs/heads/rejected'], success=False)
@@ -206,53 +203,11 @@ def exercise_git_gates(test: unittest.TestCase, platform: str, inputs):
         test.assertEqual(before, after)
         test.assertEqual(hashlib.sha256(existing.read_bytes()).hexdigest(), existing_hash)
 
-class RustHookTests(unittest.TestCase):
-    platform = 'rust'
-
-    def test_real_commit_push_gates_and_global_preservation(self):
-        leaf = ROOT / ("rust/tauri" if self.platform == "rust" else "swift/" + self.platform)
-        self.assertTrue((leaf / ".husky/pre-commit").is_file(), "manual hook missing")
-        exercise_git_gates(self, self.platform, self.fixture_inputs())
-
-    def fixture_inputs(self):
-        from tests.native.rust_helpers import CACHE as RUST_CACHE, LIB_SOURCE, rust_env
-        selected = os.environ.get('NATIVE_HOOK_RUST_FIXTURE', '')
-        self.assertEqual(selected, 'fixture-50ncrnnd', 'reuse must be explicitly approved; no new Rust target')
-        root = RUST_CACHE / selected
-        self.assertTrue(root.is_dir())
-        self.assertFalse((root / '.git').exists(), 'existing Git ownership: stop')
-        self.assertTrue((RUST_CACHE / 'targets' / selected).is_dir())
-        # Restore only the approved fixture baseline, retaining its crate path/target.
-        for name in ['rust-toolchain.toml', 'rustfmt.toml', '.cargo/config.toml',
-                     'src-tauri/Cargo.toml', 'src-tauri/build.rs', 'src-tauri/tauri.conf.json',
-                     'src-tauri/capabilities/main.json']:
-            data = (ROOT / 'rust/tauri' / name).read_bytes()
-            (root / name).write_bytes(data)
-        copy_check_script('rust/tauri', root)
-        lock = (RUST_CACHE / 'approved-resolution/Cargo.lock').read_bytes()
-        (root / 'src-tauri/Cargo.lock').write_bytes(lock)
-        source = root / 'src-tauri/src/main.rs'
-        tests = root / 'src-tauri/src/lib.rs'
-        source.write_text('fn main() {}\n')
-        tests.write_text(LIB_SOURCE)
-        from tests.native.rust_helpers import run_rust, validate_rust_dependencies
-        result = run_rust(['rustup', 'run', '1.92.0', 'cargo', 'metadata', '--offline', '--locked',
-                           '--format-version', '1', '--manifest-path', 'src-tauri/Cargo.toml'], root)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        validate_rust_dependencies(json.loads(result.stdout), root / 'src-tauri/Cargo.lock',
-                                   RUST_CACHE / 'approved-resolution')
-        shutil.copytree(ROOT / 'rust/tauri/.husky', root / '.husky', dirs_exist_ok=True)
-        for name in ['package.json', 'pnpm-workspace.yaml', '.node-version', 'check-commit.mjs', '.gitignore']:
-            shutil.copyfile(ROOT / 'rust/tauri' / name, root / name)
-        return (root, rust_env(root), source, tests, 'fn main(){println!("bad");}\n',
-                LIB_SOURCE.replace('super::add(2, 3), 5', 'super::add(2, 3), 6'))
-
-
 class MacOSHookTests(unittest.TestCase):
     platform = 'macos'
 
     def test_real_commit_push_gates_and_global_preservation(self):
-        leaf = ROOT / ("rust/tauri" if self.platform == "rust" else "swift/" + self.platform)
+        leaf = ROOT / ("swift/" + self.platform)
         self.assertTrue((leaf / ".husky/pre-commit").is_file(), "manual hook missing")
         exercise_git_gates(self, self.platform, self.fixture_inputs())
 
@@ -279,13 +234,13 @@ class RobloxHookTests(unittest.TestCase):
     platform = 'roblox'
 
     def test_real_commit_push_gates_and_global_preservation(self):
-        self.assertTrue((ROOT / 'roblox/rojo/.husky/pre-commit').is_file(), 'manual hook missing')
+        self.assertTrue((ROOT / 'roblox/roblox-game/.husky/pre-commit').is_file(), 'manual hook missing')
         exercise_git_gates(self, self.platform, self.fixture_inputs())
 
     def fixture_inputs(self):
         from tests.native.roblox_helpers import GREETING_SPEC, copy_fixture, roblox_env
         root = copy_fixture('hooks')
-        copy_check_script('roblox/rojo', root)
+        copy_check_script('roblox/roblox-game', root)
         source = root / 'src/shared/Greeting.luau'
         tests = root / 'tests/Greeting.spec.luau'
         return (root, roblox_env(root), source, tests, 'local Greeting={}\nreturn Greeting\n',

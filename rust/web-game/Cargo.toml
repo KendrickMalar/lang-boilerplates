@@ -41,27 +41,16 @@ mem_forget = "deny"
 string_slice = "deny"
 rc_mutex = "deny"
 lossy_float_literal = "deny"
-# Same three individually selected lints as the Tauri leaf.
+# Three more individually selected lints (needless clones and eager allocation).
 redundant_clone = "deny"
 assigning_clones = "deny"
 or_fun_call = "deny"
-# Realtime only: deterministic simulation. Overflow, lossy casts, panicking indexing, and
-# float equality are rejected; float arithmetic itself stays allowed (physics needs it).
-arithmetic_side_effects = "deny"
-cast_possible_truncation = "deny"
-cast_sign_loss = "deny"
-cast_precision_loss = "deny"
-cast_possible_wrap = "deny"
-cast_lossless = "deny"
-as_conversions = "deny"
-indexing_slicing = "deny"
-float_cmp = "deny"
+# Async-safety lints for this server type.
+await_holding_lock = "deny"
+await_holding_refcell_ref = "deny"
 
 [profile.release]
 overflow-checks = true
 debug = "line-tables-only"
 # Servers catch panics per task/connection and keep running.
 panic = "unwind"
-# Realtime only: whole-program optimization for the tick loop (slower release builds).
-lto = "fat"
-codegen-units = 1

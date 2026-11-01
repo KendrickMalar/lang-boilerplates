@@ -1,10 +1,10 @@
-# Rust ルーム制サーバー — 品質設定
+# Rust Web ゲーム API サーバー（ソシャゲ型） — 品質設定
 
-ルーム制（マッチング・ロビー・ターン制の対戦）用の、自己完結した Rust virtual workspace の品質設定です。
+ソシャゲ型の Web ゲーム（HTTP API と DB 中心のサービス）用の、自己完結した Rust virtual workspace の品質設定です。
 Rust **1.99.1** / edition **2024** / `rust-version = "1.99"` を固定します。
 製品の Rust source・crate・依存（tokio、axum など）・Cargo.lock・fixture は配布しません。
 lint は最大級に厳しくしています（pedantic・nursery・cargo を deny、主要な restriction を個別に deny、警告0）。
-加えて、非同期サーバー向けの規則（`.await` をまたぐ lock・巨大な future・背圧のない channel・`actix`）を足しています。
+加えて、API・DB 向けの規則（`.await` をまたぐ lock、生 SQL 文字列、timeout のない HTTP client、`native-tls`）を足しています。
 
 ## 導入（既存ファイルを保護）
 
@@ -122,24 +122,35 @@ caller の `RUSTUP_HOME`、`CARGO_HOME`、`CARGO_TARGET_DIR` を尊重します�
 - restriction から個別に deny: `unwrap_used`、`expect_used`、`panic`、`todo`、`unimplemented`、`unreachable`、
   `dbg_macro`、`print_stdout`、`print_stderr`、`exit`、`get_unwrap`、`allow_attributes`、
   `allow_attributes_without_reason`、`undocumented_unsafe_blocks`、`mem_forget`、`string_slice`、`rc_mutex`、`lossy_float_literal`。
-  Tauri leaf と同じ `redundant_clone`・`assigning_clones`・`or_fun_call` も deny。
+  `redundant_clone`・`assigning_clones`・`or_fun_call` も deny。
 - test の中だけ unwrap・expect・panic・print を許可します（[clippy.toml](clippy.toml) の `allow-*-in-tests`）。
 - 禁止 API: `std::thread::sleep`（async の executor を止める）、`std::process::exit`（後始末を飛ばす）。
   まだ依存に無い crate の path を足すときは `allow-invalid = true` を付けます（Clippy 1.99.1 で、依存なしでも警告にならないことを確認済み）。
 - release profile: `overflow-checks = true`、`debug = "line-tables-only"`、`panic = "unwind"`（panic を受け止めて動き続けるため）。
 
-### room 専用の規則
+### API・DB 向けの規則
 
-多数のルームを非同期 task で動かす前提の規則です。他の種類の leaf とは、入る規則が違います。
-
-- Clippy で deny: `await_holding_lock`、`await_holding_refcell_ref`（lock や `RefCell` の borrow を `.await` をまたいで持たない）、
-  `await_holding_invalid_type`（`clippy.toml` の `await-holding-invalid-types` で指定した型。既定では空）、
-  `large_futures`（大きな future を stack に置かず `Box::pin` する）。
-- 禁止 API: `tokio::sync::mpsc::unbounded_channel`、`futures::channel::mpsc::unbounded`。
-  背圧のない queue はメモリを使い尽くします。容量つきの `mpsc::channel` を使います。
+- Clippy で deny: `await_holding_lock`、`await_holding_refcell_ref`（lock や `RefCell` の borrow を `.await` をまたいで持たない）。
+- 禁止 API: `sqlx::query`・`sqlx::query_as`（生 SQL 文字列は compile 時に検査されません。`query!`・`query_as!` マクロを使う）、
+  `reqwest::Client::new`・`reqwest::get`（どちらも timeout がありません。`Client::builder().timeout(..)` で作った Client を使う）。
+  `reqwest::Client::default()` は止められません。Clippy の `disallowed-methods` は trait 実装のメソッドを型ごとに指定できないためです。
+  `Client::builder().timeout(..)` で作るのをレビューで確かめてください。
   まだ依存に無い crate の path なので `allow-invalid = true` を付けています。
-- `tokio::spawn` は禁止していません。代わりの `tokio::task::Builder` は `--cfg tokio_unstable` が要り、
-  leaf から全依存の rustflags を変えることになるためです。task は `JoinSet` や `TaskTracker` で管理します。
+- `native-tls` は ban です（TLS は rustls に限定。`reqwest` は `default-features = false` と `rustls` の feature を使う）。
+
+#### sqlx のオフライン検査（`.sqlx/` の commit が必須）
+
+sqlx のマクロは compile 時に DB か `.sqlx/` のメタデータが要ります。この leaf の `scripts/check.sh` は
+`SQLX_OFFLINE=true` を既定にして（呼び出し側が `SQLX_OFFLINE` を指定していればそれを優先）、実行時に
+`env: SQLX_OFFLINE=true` と表示します。したがって sqlx のマクロを使うなら、`.sqlx/` を作って commit します。
+sqlx をまだ使っていない間は何も要りません。
+
+```sh
+cargo install sqlx-cli --locked      # 利用側で範囲を確かめ、別に承認してから
+cargo sqlx prepare --workspace       # DATABASE_URL の DB に接続して .sqlx/ を作る
+git add .sqlx                        # クエリを変えるたびに作り直して commit する
+cargo sqlx prepare --workspace --check   # .sqlx/ が最新かの確認（CI 向き）
+```
 
 ### 厳しい lint を外すとき
 
@@ -174,19 +185,20 @@ crate を公開する（`publish` を外す）ときは、`description`・`licen
 
 - ライセンスは MIT、Apache-2.0、BSD-2-Clause、BSD-3-Clause、ISC、Unicode-3.0、Zlib だけを許可します。ほかは利用側で追加します。
   自分の `publish = false` の crate はライセンス検査の対象外です（`[licenses.private] ignore = true`）。
-  rustls を使う構成（reqwest の `rustls`、sqlx の rustls 系 feature など）を入れる場合は、`CDLA-Permissive-2.0`（webpki-roots）などを `[licenses] allow` に足す必要が出ることがあります。`cargo deny check licenses` の出力で確かめてください。
-- ban: `bincode`（RUSTSEC-2025-0141）、`fred`、`poem`、`openssl`、`openssl-sys`、`actix`（2024 で停止。room 専用）。crates.io 以外の registry と git 依存は拒否します。
+  この leaf が勧める rustls 構成（reqwest の `rustls`、sqlx の rustls 系 feature）は、たいてい `CDLA-Permissive-2.0`（webpki-roots）を `[licenses] allow` に足す必要があり、ほかにも要ることがあります（例: 暗号 backend の crate）。
+  `cargo deny check licenses` の出力で確かめて、必要なものを足してください。許可リストの初期値は変えていません。
+- ban: `bincode`（RUSTSEC-2025-0141）、`fred`、`poem`、`openssl`、`openssl-sys`、`native-tls`（rustls に限定）。crates.io 以外の registry と git 依存は拒否します。
 - `[graph] targets` は書いていません。デプロイ先に合わせて、例えば `targets = ["x86_64-unknown-linux-gnu"]` を足します。
 
 ## 推奨スタック（調査時点 2026-10-30）
 
 | 役割 | 中核 | 補助 | 避けるもの |
 | --- | --- | --- | --- |
-| ルーム制 | tokio、axum + WebSocket、ルームごとの task（`JoinSet`）と容量つき `mpsc::channel` | `tokio-util`（`TaskTracker`・`CancellationToken`）、状態の永続化は sqlx か redis | actix（停止）、fred、poem |
+| ソシャゲ型 API | axum、sqlx（PostgreSQL、`query!` マクロと `.sqlx/`）、`reqwest`（rustls、timeout つき） | redis（セッション・ランキング）、`tower`（timeout・rate limit） | fred、poem、native-tls |
 | 共有のシリアライズ | Protocol Buffers | — | bincode（保守終了） |
 
-- ルームの状態は1 task が所有し、他の task とは容量つきの channel で話すと、lock をまたぐ `.await` を避けられます。
-- TLS は rustls を使います（`openssl` は ban）。
+- DB のスキーマ変更は migration で管理し、`cargo sqlx prepare` の結果（`.sqlx/`）と同じ commit に含めます。
+- 外部 API を呼ぶ HTTP client は timeout を必ず設定します。
 - crate は I/O を持たない核（ルール）とバイナリ（通信・起動）に分けると、核を単体テストしやすくなります。
 
 ## Husky による Git フック（必須・明示有効化）
@@ -222,10 +234,11 @@ commit は未 stage・未追跡・index を隠す flag・検査中の stage 内�
 
 macOS（aarch64）で、隔離した RUSTUP_HOME・CARGO_HOME と最小の fixture crate を使い、実ツールで次を確かめています。
 
+- 2026-11-01 に game-social から改名しました。設定の中身は変えていません。
 - 正常系: 依存なしの clean な workspace で `commit` の全段が通ること、`push` の全段（format・lint・deps・test・coverage・advisories・build）がこの順で通ること（advisories は実際に RustSec の DB を取得しました）。
-- 異常系: `.await` をまたいで `std::sync::Mutex` の guard を持つ関数が `await_holding_lock` で落ち、await の前に guard を手放すと通ること。`tokio::sync::mpsc::unbounded_channel`・`futures::channel::mpsc::unbounded` の呼び出しが`disallowed_methods` で落ちること（依存の代わりに path 依存の偽 crate を使用）。`bincode`・`actix` の偽 crate が `deps` 段で ban されること。
-- 設定してあるが、この leaf では実ツールで確かめていない規則: `await_holding_refcell_ref`、`await_holding_invalid_type`、`large_futures`。
-- 共通の段（unwrap・print・unsafe・missing docs・pedantic・`std::thread::sleep`・format・`[lints] workspace = true` 欠落・未使用依存・テスト0件・Cargo.lock なし・tool 不足・版違い・版の読み取り失敗・行カバレッジ90%未満・advisory DB の取得失敗とオフライン）の異常系は、byte 単位で同一の `scripts/check.sh` と共通設定を持つ game-realtime の leaf で実ツールの確認をしています。この leaf では繰り返していません。
+- 異常系: `.await` をまたいで `std::sync::Mutex` の guard を持つ関数が `await_holding_lock` で落ち、await の前に guard を手放すと通ること。`sqlx::query`・`sqlx::query_as`・`reqwest::Client::new`・`reqwest::get` の呼び出しが `disallowed_methods` で落ちること（path 依存の偽 crate を使用）。`bincode`・`native-tls` の偽 crate が `deps` 段で ban されること。sqlx なし（`.sqlx/` なし）で `commit` が通ること、`check.sh` が `env: SQLX_OFFLINE=true` を表示し、呼び出し側の指定を尊重すること。
+- 設定してあるが、この leaf では実ツールで確かめていない規則: `await_holding_refcell_ref`。
+- 共通の段（unwrap・print・unsafe・missing docs・pedantic・`std::thread::sleep`・format・`[lints] workspace = true` 欠落・未使用依存・テスト0件・Cargo.lock なし・tool 不足・版違い・版の読み取り失敗・行カバレッジ90%未満・advisory DB の取得失敗とオフライン）の異常系は、`SQLX_OFFLINE` の4行を除いて同じ `scripts/check.sh` を持つ game の leaf（2026-11-01 に統合する前の game-realtime の leaf）で実ツールの確認をしています。この leaf では繰り返していません。
 
 fixture は配布しません。**Linux・Windows での実行、CI、本物のサーバー依存（tokio など）での build は未実施**です。
 
