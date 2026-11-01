@@ -1,5 +1,5 @@
 // 機能別の複数入口。README「## アーキテクチャ」の規則を ESLint で強制する。
-// eslint.config.mjs で createConfig() の後ろに足して使う。
+// 製品 root の architecture.mjs へコピーすると、eslint.config.mjs が読み込む。
 import boundaries from "eslint-plugin-boundaries";
 
 const sources = ["src/**/*.{js,mjs,cjs,ts,tsx,mts,cts}"];

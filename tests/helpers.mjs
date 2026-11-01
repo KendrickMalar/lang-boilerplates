@@ -45,9 +45,21 @@ export async function write(root, path, text) {
   await mkdir(dirname(join(root, path)), { recursive: true });
   await writeFile(join(root, path), text);
 }
+// Default architecture choice per leaf. eslint.config.mjs refuses to run without one.
+export const DEFAULT_ARCHITECTURE = {
+  cli: "onion",
+  web: "onion",
+  "web-game": "pure-core",
+  "ts-library": "single-entry",
+};
 export async function copyPreset(
   name,
-  { dependencies = true, sample = true, tests = true } = {},
+  {
+    dependencies = true,
+    sample = true,
+    tests = true,
+    architecture = true,
+  } = {},
 ) {
   await mkdir(join(verification, "fixtures"), { recursive: true });
   await mkdir(join(verification, "home"), { recursive: true });
@@ -58,6 +70,12 @@ export async function copyPreset(
     force: false,
     errorOnExist: true,
   });
+  if (architecture)
+    await cp(
+      join(root, "architecture", DEFAULT_ARCHITECTURE[name] + ".mjs"),
+      join(root, "architecture.mjs"),
+      { force: false, errorOnExist: true },
+    );
   if (dependencies) {
     const toolDirectory = join(root, ".tools", "similarity");
     await mkdir(toolDirectory, { recursive: true });

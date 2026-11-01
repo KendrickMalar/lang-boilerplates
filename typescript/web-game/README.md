@@ -45,6 +45,7 @@
 | [playwright.preview.config.ts](./playwright.preview.config.ts) | `playwright.preview.config.ts` |
 | [.husky/pre-commit](./.husky/pre-commit)                       | `.husky/pre-commit`            |
 | [.husky/pre-push](./.husky/pre-push)                           | `.husky/pre-push`              |
+| 選んだ `architecture/<選択肢>.mjs`（「アーキテクチャ」節）     | `architecture.mjs`             |
 | [LICENSE](./LICENSE)                                           | `LICENSE.lang-boilerplates`    |
 
 設定はMITです。著作権表示とライセンス文を保持し、利用側のライセンスは上書きしません。ゲームコード、サンプルテスト、index.html、lock、ブラウザ本体は配布しません。設定だけ・テストなしの状態を合格にはしません。
@@ -196,6 +197,10 @@ Roblox本実装との仕様・データ・シード・シナリオの整合は�
 
 scaffold は仕様策定でこの節の選択肢を人に提示し、基本設計で選ばれた選択肢の規則と強制設定（`architecture/`）を導入します。
 
+導入するのは選んだ1つだけです。`architecture/<選択肢>.mjs` を製品 root の `architecture.mjs` へコピーすると、配布の `eslint.config.mjs` が読み込み、`pnpm lint`（`pnpm check` の Lint 段、commit 前・push 前のフック）が規則を検査します。`architecture.mjs` が無いときは飛ばさず、`Missing architecture.mjs` とコピーの手順（`cp architecture/pure-core.mjs architecture.mjs`。選択肢は pure-core・ecs・engine-shell）を出して失敗します（黙って検査が効かない状態にしない）。基本設計で選ぶ前から check を通すには、既定の選択肢をコピーしておきます。
+
+組み立て役は `src/main.ts` か `src/index.ts` のどちらか1つです。検査対象は src の JS/TS で、テスト（`tests/**`・`*.test.*`・`*.spec.*`・`__tests__`）は対象外です。import は eslint-import-resolver-typescript が `tsconfig.app.json` の解決どおりに辿ります（拡張子なし・`.js` 付きの両方）。resolver を外すと層を判定できず、すべての import が違反になります（黙って見逃さない）。src 直下の素材を import すると層の外として拒否されるので、素材は描画する層に置きます。例外が要るときは規則を消さず、policy を足して理由をこの README に残します。
+
 ### 選び方
 
 - ルール（移動・当たり判定の結果・得点・勝敗）を描画と切り離して単体テストし、リプレイや固定時間刻みで再現したいか → **ルールの純粋コア**（既定。迷ったらこれ）
@@ -217,13 +222,13 @@ flowchart LR
   application --> domain
 ```
 
-| 層・ファイル          | 置くもの                                                                |
-| --------------------- | ----------------------------------------------------------------------- |
-| `src/domain/`         | 状態の型と `step(state, input, dt)`。乱数・時刻は引数で受け取る         |
-| `src/application/`    | 固定時間刻みのループ、シーンの進行、保存の口（interface）               |
-| `src/infrastructure/` | 物理（Rapier）・音・入力・保存の実装                                    |
-| `src/presentation/`   | 描画（Three.js・Canvas）・HUD。画像などの素材もここ                     |
-| `src/main.ts`         | 組み立て役。`index.html` の `<script type="module" src="/src/main.ts">` |
+| 層・ファイル                           | 置くもの                                                                |
+| -------------------------------------- | ----------------------------------------------------------------------- |
+| `src/domain/`                          | 状態の型と `step(state, input, dt)`。乱数・時刻は引数で受け取る         |
+| `src/application/`                     | 固定時間刻みのループ、シーンの進行、保存の口（interface）               |
+| `src/infrastructure/`                  | 物理（Rapier）・音・入力・保存の実装                                    |
+| `src/presentation/`                    | 描画（Three.js・Canvas）・HUD。画像などの素材もここ                     |
+| `src/main.ts`（または `src/index.ts`） | 組み立て役。`index.html` の `<script type="module" src="/src/main.ts">` |
 
 | 規則                                                                                                                                | 区分     |
 | ----------------------------------------------------------------------------------------------------------------------------------- | -------- |
@@ -232,39 +237,16 @@ flowchart LR
 | application は domain だけを import する（外部パッケージも不可）                                                                    | MUST     |
 | infrastructure・presentation は domain・application・外部パッケージを import できる                                                 | MUST     |
 | presentation は infrastructure を import する（つなぐのは `src/main.ts`）                                                           | MUST NOT |
-| `src/main.ts` 以外の、層の外の src ファイルを置く・import する                                                                      | MUST NOT |
+| 組み立て役以外の、層の外の src ファイルを置く・import する                                                                          | MUST NOT |
 
 - 向く: ルールが複雑で、描画なしの単体テストやリプレイで確かめたいゲーム。2D・3D どちらでも。
 - 向かない: 同種の物が大量にあり、性質の組み合わせで振る舞いが変わるゲーム（ECS が合う）。
 
-強制設定: [architecture/pure-core.mjs](./architecture/pure-core.mjs)（eslint-plugin-boundaries と `no-restricted-globals`）。
+強制設定: [architecture/pure-core.mjs](./architecture/pure-core.mjs)（eslint-plugin-boundaries と `no-restricted-globals`）。選んだら製品 root の `architecture.mjs` へコピーします。既存の `architecture.mjs` があれば停止して差分を確認します。
 
-1. `architecture/pure-core.mjs` を対象プロジェクトの同じパスへコピーします。既存ファイルがあれば停止して差分を確認します。
-2. `eslint.config.mjs` を次の内容にします。既存の設定があれば丸ごと置き換えず、`architecture` の import と引数の追加だけを統合します。
-3. これで `pnpm lint`（`pnpm check` の Lint 段、commit 前・push 前のフック）が層の規則を検査します。`check` の変更は不要です。
-
-```js
-import { defineConfig } from "eslint/config";
-import playwright from "eslint-plugin-playwright";
-import { createConfig } from "./eslint.base.mjs";
-import architecture from "./architecture/pure-core.mjs";
-
-export default defineConfig(
-  createConfig({ environment: "browser" }),
-  {
-    files: ["tests/e2e/**/*.ts"],
-    plugins: playwright.configs["flat/recommended"].plugins,
-    rules: {
-      ...playwright.configs["flat/recommended"].rules,
-      "playwright/no-focused-test": "error",
-      "playwright/no-skipped-test": "error",
-    },
-  },
-  architecture,
-);
+```sh
+cp architecture/pure-core.mjs architecture.mjs
 ```
-
-検査対象は src の JS/TS で、テスト（`tests/**`・`*.test.*`・`*.spec.*`・`__tests__`）は対象外です。import は eslint-import-resolver-typescript が `tsconfig.app.json` の解決どおりに辿ります（拡張子なし・`.js` 付きの両方）。resolver を外すと層を判定できず、すべての import が違反になります（黙って見逃さない）。src 直下の素材を import すると層の外として拒否されるので、素材は描画する層に置きます。例外が要るときは規則を消さず、policy を足して理由をこの README に残します。
 
 ### ECS
 
@@ -279,12 +261,12 @@ flowchart LR
   systems --> components
 ```
 
-| 層・ファイル          | 置くもの                                                       |
-| --------------------- | -------------------------------------------------------------- |
-| `src/ecs/components/` | データだけの型（位置・速度・体力など）                         |
-| `src/ecs/systems/`    | コンポーネントを読み書きする処理（移動・衝突・寿命など）       |
-| `src/ecs/render/`     | コンポーネントを読んで描画する処理。描画ライブラリはここだけ   |
-| `src/main.ts`         | 組み立て役。ワールドを作り、毎フレーム systems → render を呼ぶ |
+| 層・ファイル                           | 置くもの                                                       |
+| -------------------------------------- | -------------------------------------------------------------- |
+| `src/ecs/components/`                  | データだけの型（位置・速度・体力など）                         |
+| `src/ecs/systems/`                     | コンポーネントを読み書きする処理（移動・衝突・寿命など）       |
+| `src/ecs/render/`                      | コンポーネントを読んで描画する処理。描画ライブラリはここだけ   |
+| `src/main.ts`（または `src/index.ts`） | 組み立て役。ワールドを作り、毎フレーム systems → render を呼ぶ |
 
 | 規則                                                                                           | 区分     |
 | ---------------------------------------------------------------------------------------------- | -------- |
@@ -293,34 +275,17 @@ flowchart LR
 | systems は render・`three`・`@react-three/*` を import する                                    | MUST NOT |
 | components と systems は DOM などブラウザだけのグローバル・入出力のグローバルを使う            | MUST NOT |
 | render は components と外部パッケージを import できる（systems は不可）                        | MUST     |
-| `src/main.ts` 以外の、`src/ecs/` の外の src ファイルを置く                                     | MUST NOT |
+| 組み立て役以外の、`src/ecs/` の外の src ファイルを置く                                         | MUST NOT |
 
 - 向く: 弾幕・群れ・粒子など、同種の物が大量にあるゲーム。性質を足し引きして種類を増やしたい。
 - 向かない: 物が少なく、ルールの手順が主役のゲーム（パズル・カード・ターン制）。
 
 ECS ライブラリは任意です。使うなら `koota` か `bitecs` を選び、版を固定して `dependencies` に足します（この設定一式には含めません）。足さずに配列や `Map` で組んでも規則は同じです。
 
-強制設定: [architecture/ecs.mjs](./architecture/ecs.mjs)。導入手順はルールの純粋コアと同じで、コピーするファイルを `architecture/ecs.mjs` にし、`eslint.config.mjs` を次にします。
+強制設定: [architecture/ecs.mjs](./architecture/ecs.mjs)。選んだら製品 root の `architecture.mjs` へコピーします。既存の `architecture.mjs` があれば停止して差分を確認します。
 
-```js
-import { defineConfig } from "eslint/config";
-import playwright from "eslint-plugin-playwright";
-import { createConfig } from "./eslint.base.mjs";
-import architecture from "./architecture/ecs.mjs";
-
-export default defineConfig(
-  createConfig({ environment: "browser" }),
-  {
-    files: ["tests/e2e/**/*.ts"],
-    plugins: playwright.configs["flat/recommended"].plugins,
-    rules: {
-      ...playwright.configs["flat/recommended"].rules,
-      "playwright/no-focused-test": "error",
-      "playwright/no-skipped-test": "error",
-    },
-  },
-  architecture,
-);
+```sh
+cp architecture/ecs.mjs architecture.mjs
 ```
 
 ### コア＋エンジンの殻
@@ -334,43 +299,26 @@ flowchart LR
   shell --> core
 ```
 
-| 層・ファイル  | 置くもの                                                                 |
-| ------------- | ------------------------------------------------------------------------ |
-| `src/core/`   | 状態・ルール・判定。エンジンの型を使わず、自前の型（ベクトルなど）で書く |
-| `src/shell/`  | Three.js・Rapier・入力・音の呼び出しと、core の状態との変換              |
-| `src/main.ts` | 組み立て役                                                               |
+| 層・ファイル                           | 置くもの                                                                 |
+| -------------------------------------- | ------------------------------------------------------------------------ |
+| `src/core/`                            | 状態・ルール・判定。エンジンの型を使わず、自前の型（ベクトルなど）で書く |
+| `src/shell/`                           | Three.js・Rapier・入力・音の呼び出しと、core の状態との変換              |
+| `src/main.ts`（または `src/index.ts`） | 組み立て役                                                               |
 
 | 規則                                                                                                                                  | 区分     |
 | ------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | core は core の中だけを import する                                                                                                   | MUST     |
 | core はエンジン（`three`・`@dimforge/*` など）を含む外部パッケージ・shell・DOM などブラウザだけのグローバル・入出力のグローバルを使う | MUST NOT |
 | shell は core と外部パッケージを import できる                                                                                        | MUST     |
-| `src/main.ts` 以外の、core・shell の外の src ファイルを置く                                                                           | MUST NOT |
+| 組み立て役以外の、core・shell の外の src ファイルを置く                                                                               | MUST NOT |
 
 - 向く: エンジンを差し替える可能性がある。サーバー側で同じルールを動かしたい。層は2つで足りる規模。
 - 向かない: 描画・物理・入力・保存を別々に差し替えたい（ルールの純粋コアが合う）。
 
-強制設定: [architecture/engine-shell.mjs](./architecture/engine-shell.mjs)。導入手順はルールの純粋コアと同じで、コピーするファイルを `architecture/engine-shell.mjs` にし、`eslint.config.mjs` を次にします。core で純粋な外部パッケージを使いたいときは、package 名を限った policy を足し、理由を残します。
+強制設定: [architecture/engine-shell.mjs](./architecture/engine-shell.mjs)。選んだら製品 root の `architecture.mjs` へコピーします。既存の `architecture.mjs` があれば停止して差分を確認します。core で純粋な外部パッケージを使いたいときは、package 名を限った policy を足し、理由を残します。
 
-```js
-import { defineConfig } from "eslint/config";
-import playwright from "eslint-plugin-playwright";
-import { createConfig } from "./eslint.base.mjs";
-import architecture from "./architecture/engine-shell.mjs";
-
-export default defineConfig(
-  createConfig({ environment: "browser" }),
-  {
-    files: ["tests/e2e/**/*.ts"],
-    plugins: playwright.configs["flat/recommended"].plugins,
-    rules: {
-      ...playwright.configs["flat/recommended"].rules,
-      "playwright/no-focused-test": "error",
-      "playwright/no-skipped-test": "error",
-    },
-  },
-  architecture,
-);
+```sh
+cp architecture/engine-shell.mjs architecture.mjs
 ```
 
 ## 公式資料

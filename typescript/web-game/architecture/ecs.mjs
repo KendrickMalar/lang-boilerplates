@@ -1,5 +1,5 @@
 // ECS（エンティティ・コンポーネント・システム）。README「## アーキテクチャ」の規則を ESLint で強制する。
-// eslint.config.mjs で createConfig() の後ろに足して使う。
+// 製品 root の architecture.mjs へコピーすると、eslint.config.mjs が読み込む。
 import boundaries from "eslint-plugin-boundaries";
 import globals from "globals";
 
@@ -47,7 +47,9 @@ export default [
       "boundaries/elements": ["components", "systems", "render"].map(
         (type) => ({ type, pattern: "src/ecs/" + type, partialMatch: false }),
       ),
-      "boundaries/files": [{ category: "composition", pattern: "src/main.ts" }],
+      "boundaries/files": [
+        { category: "composition", pattern: "src/{index,main}.ts" },
+      ],
     },
     rules: {
       "boundaries/no-unknown-files": "error",

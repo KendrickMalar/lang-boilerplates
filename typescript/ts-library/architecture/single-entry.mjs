@@ -1,6 +1,6 @@
 // 入口1つ＋internal（既定）。README「## アーキテクチャ」の規則を ESLint で強制する。
-// 循環の禁止は single-entry.depcruise.mjs（dependency-cruiser）で検査する。
-// eslint.config.mjs で createConfig() の後ろに足して使う。
+// 循環の禁止は depcruise.config.mjs（dependency-cruiser、`pnpm lint`）で検査する。
+// 製品 root の architecture.mjs へコピーすると、eslint.config.mjs が読み込む。
 import boundaries from "eslint-plugin-boundaries";
 
 const sources = ["src/**/*.{js,mjs,cjs,ts,tsx,mts,cts}"];

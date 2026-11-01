@@ -1,4 +1,4 @@
-// 入口1つ＋internal の循環禁止。`depcruise src --config architecture/single-entry.depcruise.mjs`
+// src の中の import の循環を禁止する（どのアーキテクチャの選択肢でも）。`pnpm lint` が実行する。
 /** @type {import("dependency-cruiser").IConfiguration} */
 export default {
   forbidden: [

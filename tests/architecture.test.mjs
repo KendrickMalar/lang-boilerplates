@@ -1,9 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { copyFile, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   ROOT,
+  DEFAULT_ARCHITECTURE,
   copyPreset,
   write,
   runAt,
@@ -13,24 +15,19 @@ import {
 import { architectureCases } from "./architecture-fixtures.mjs";
 import { architectureSection } from "./architecture-readme.mjs";
 
-// Enables a choice exactly as its README section says: the eslint.config.mjs block
-// and, when given, the replacement lint script.
+// Enables a choice exactly as its README section says: the cp commands in its sh block.
 async function enableFromReadme(root, leaf, heading) {
   const readme = await readFile(
     join(ROOT, "typescript", leaf, "README.md"),
     "utf8",
   );
   const section = architectureSection(readme, heading);
-  const config = /```js\n([\s\S]*?)```/.exec(section);
-  assert.ok(config, leaf + " " + heading + ": missing eslint.config.mjs block");
-  await writeFile(join(root, "eslint.config.mjs"), config[1]);
-  const lint = /"lint": "([^"]+)"/.exec(section);
-  if (lint) {
-    const path = join(root, "package.json");
-    const pkg = JSON.parse(await readFile(path, "utf8"));
-    pkg.scripts.lint = lint[1];
-    await writeFile(path, JSON.stringify(pkg, null, 2) + "\n");
-  }
+  const block = /```sh\n([\s\S]*?)```/.exec(section);
+  assert.ok(block, leaf + " " + heading + ": missing sh block");
+  const copies = [...block[1].matchAll(/^cp (\S+) (\S+)$/gm)];
+  assert.ok(copies.length > 0, leaf + " " + heading + ": no cp command");
+  for (const [, from, to] of copies)
+    await copyFile(join(root, from), join(root, to), constants.COPYFILE_EXCL);
 }
 async function writeAll(root, files) {
   for (const [path, source] of Object.entries(files))
@@ -74,7 +71,10 @@ for (const item of architectureCases) {
       " passes conforming code and rejects violations",
     { timeout: 600_000 },
     async (t) => {
-      const root = await copyPreset(item.leaf, { sample: false });
+      const root = await copyPreset(item.leaf, {
+        sample: false,
+        architecture: false,
+      });
       await enableFromReadme(root, item.leaf, item.heading);
       await writeAll(root, item.files);
       await t.test("conforming layout passes lint", async () => {
@@ -115,6 +115,11 @@ for (const item of architectureCases) {
               item.entryViolation.source,
             );
             assertReported(await lintReport(root), item.entryViolation);
+            await write(
+              root,
+              item.entryViolation.path,
+              item.files[item.entryViolation.path],
+            );
           },
         );
       if (item.cycle)
@@ -131,10 +136,13 @@ for (const item of architectureCases) {
 
 test("architecture rules fail closed when the TypeScript resolver is missing", async () => {
   const [item] = architectureCases;
-  const root = await copyPreset(item.leaf, { sample: false });
+  const root = await copyPreset(item.leaf, {
+    sample: false,
+    architecture: false,
+  });
   await enableFromReadme(root, item.leaf, item.heading);
   await writeAll(root, item.files);
-  const path = join(root, "architecture", item.option + ".mjs");
+  const path = join(root, "architecture.mjs");
   const config = await readFile(path, "utf8");
   assert.match(config, /"import\/resolver"/);
   await writeFile(
@@ -143,3 +151,24 @@ test("architecture rules fail closed when the TypeScript resolver is missing", a
   );
   await expectResult(root, ["lint"], 1, /boundaries\/dependencies/);
 });
+
+for (const [leaf, option] of Object.entries(DEFAULT_ARCHITECTURE)) {
+  test(
+    leaf + " lint stops when no architecture choice is installed",
+    async () => {
+      const root = await copyPreset(leaf, { architecture: false });
+      const result = await expectResult(
+        root,
+        ["lint"],
+        1,
+        /Missing architecture\.mjs/,
+      );
+      assert.ok(
+        result.output.includes(
+          "cp architecture/" + option + ".mjs architecture.mjs",
+        ),
+        result.output,
+      );
+    },
+  );
+}

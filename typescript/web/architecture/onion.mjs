@@ -1,5 +1,5 @@
 // オニオン（この用途の唯一の型）。README「## アーキテクチャ」の規則を ESLint で強制する。
-// eslint.config.mjs で createConfig() の後ろに足して使う。
+// 製品 root の architecture.mjs へコピーすると、eslint.config.mjs が読み込む。
 import boundaries from "eslint-plugin-boundaries";
 import globals from "globals";
 
@@ -42,7 +42,9 @@ export default [
         pattern: "src/" + type,
         partialMatch: false,
       })),
-      "boundaries/files": [{ category: "composition", pattern: "src/main.ts" }],
+      "boundaries/files": [
+        { category: "composition", pattern: "src/{index,main}.ts" },
+      ],
     },
     rules: {
       // 層にも組み立て役にも当たらない src のファイルは置かない。

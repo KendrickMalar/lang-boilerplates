@@ -43,7 +43,7 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . --max-warnings 0",
+    "lint": "eslint . --max-warnings 0 && depcruise src --config depcruise.config.mjs",
     "lint:duplicates": "node check-duplicates.mjs",
     "lint:similarity": "node check-similarity.mjs",
     "format": "prettier . --write",

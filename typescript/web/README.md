@@ -8,33 +8,34 @@
 
 表のファイルを対象プロジェクトのルートへ導入します。ドットファイルと.husky内のフックも含みます。READMEは導入手順として読み、コピーは任意です。既存ファイル・symlink・既存.huskyがある場合は停止し、差分と影響を提示して許可を得てください。既存package.jsonやpnpm-workspace.yamlを丸ごと上書きせず、必要な差分を統合します。
 
-| 同じディレクトリのコピー元                         | コピー先（対象プロジェクトのルート基準） |
-| -------------------------------------------------- | ---------------------------------------- |
-| [package.json](./package.json)                     | `package.json`                           |
-| [tsconfig.base.json](./tsconfig.base.json)         | `tsconfig.base.json`                     |
-| [tsconfig.json](./tsconfig.json)                   | `tsconfig.json`                          |
-| [eslint.base.mjs](./eslint.base.mjs)               | `eslint.base.mjs`                        |
-| [eslint.config.mjs](./eslint.config.mjs)           | `eslint.config.mjs`                      |
-| [.jscpd.json](./.jscpd.json)                       | `.jscpd.json`                            |
-| [check-commit.mjs](./check-commit.mjs)             | `check-commit.mjs`                       |
-| [check-similarity.mjs](./check-similarity.mjs)     | `check-similarity.mjs`                   |
-| [quality-sources.mjs](./quality-sources.mjs)       | `quality-sources.mjs`                    |
-| [check-duplicates.mjs](./check-duplicates.mjs)     | `check-duplicates.mjs`                   |
-| [.prettierrc.json](./.prettierrc.json)             | `.prettierrc.json`                       |
-| [.prettierignore](./.prettierignore)               | `.prettierignore`                        |
-| [.editorconfig](./.editorconfig)                   | `.editorconfig`                          |
-| [.gitignore](./.gitignore)                         | `.gitignore`                             |
-| [.node-version](./.node-version)                   | `.node-version`                          |
-| [lint-staged.config.mjs](./lint-staged.config.mjs) | `lint-staged.config.mjs`                 |
-| [pnpm-workspace.yaml](./pnpm-workspace.yaml)       | `pnpm-workspace.yaml`                    |
-| [vitest.config.ts](./vitest.config.ts)             | `vitest.config.ts`                       |
-| [tsconfig.app.json](./tsconfig.app.json)           | `tsconfig.app.json`                      |
-| [tsconfig.tools.json](./tsconfig.tools.json)       | `tsconfig.tools.json`                    |
-| [tsconfig.tests.json](./tsconfig.tests.json)       | `tsconfig.tests.json`                    |
-| [vite.config.ts](./vite.config.ts)                 | `vite.config.ts`                         |
-| [.husky/pre-commit](./.husky/pre-commit)           | `.husky/pre-commit`                      |
-| [.husky/pre-push](./.husky/pre-push)               | `.husky/pre-push`                        |
-| [LICENSE](./LICENSE)                               | `LICENSE.lang-boilerplates`              |
+| 同じディレクトリのコピー元                                 | コピー先（対象プロジェクトのルート基準） |
+| ---------------------------------------------------------- | ---------------------------------------- |
+| [package.json](./package.json)                             | `package.json`                           |
+| [tsconfig.base.json](./tsconfig.base.json)                 | `tsconfig.base.json`                     |
+| [tsconfig.json](./tsconfig.json)                           | `tsconfig.json`                          |
+| [eslint.base.mjs](./eslint.base.mjs)                       | `eslint.base.mjs`                        |
+| [eslint.config.mjs](./eslint.config.mjs)                   | `eslint.config.mjs`                      |
+| [.jscpd.json](./.jscpd.json)                               | `.jscpd.json`                            |
+| [check-commit.mjs](./check-commit.mjs)                     | `check-commit.mjs`                       |
+| [check-similarity.mjs](./check-similarity.mjs)             | `check-similarity.mjs`                   |
+| [quality-sources.mjs](./quality-sources.mjs)               | `quality-sources.mjs`                    |
+| [check-duplicates.mjs](./check-duplicates.mjs)             | `check-duplicates.mjs`                   |
+| [.prettierrc.json](./.prettierrc.json)                     | `.prettierrc.json`                       |
+| [.prettierignore](./.prettierignore)                       | `.prettierignore`                        |
+| [.editorconfig](./.editorconfig)                           | `.editorconfig`                          |
+| [.gitignore](./.gitignore)                                 | `.gitignore`                             |
+| [.node-version](./.node-version)                           | `.node-version`                          |
+| [lint-staged.config.mjs](./lint-staged.config.mjs)         | `lint-staged.config.mjs`                 |
+| [pnpm-workspace.yaml](./pnpm-workspace.yaml)               | `pnpm-workspace.yaml`                    |
+| [vitest.config.ts](./vitest.config.ts)                     | `vitest.config.ts`                       |
+| [tsconfig.app.json](./tsconfig.app.json)                   | `tsconfig.app.json`                      |
+| [tsconfig.tools.json](./tsconfig.tools.json)               | `tsconfig.tools.json`                    |
+| [tsconfig.tests.json](./tsconfig.tests.json)               | `tsconfig.tests.json`                    |
+| [vite.config.ts](./vite.config.ts)                         | `vite.config.ts`                         |
+| [.husky/pre-commit](./.husky/pre-commit)                   | `.husky/pre-commit`                      |
+| [.husky/pre-push](./.husky/pre-push)                       | `.husky/pre-push`                        |
+| 選んだ `architecture/<選択肢>.mjs`（「アーキテクチャ」節） | `architecture.mjs`                       |
+| [LICENSE](./LICENSE)                                       | `LICENSE.lang-boilerplates`              |
 
 設定はMITです。ライセンス文・著作権表示を保持してください。LICENSEは既存ライセンスを上書きしないよう、例えばLICENSE.lang-boilerplatesとして保存します。利用プロジェクト自身のライセンスを自動変更しません。
 
@@ -60,7 +61,7 @@ pnpm install --ignore-scripts --engine-strict
 | コマンド               | 内容                                                                 |
 | ---------------------- | -------------------------------------------------------------------- |
 | `pnpm typecheck`       | src・テスト・TS設定の型チェック                                      |
-| `pnpm lint`            | 型情報Lint。warningも不合格                                          |
+| `pnpm lint`            | 型情報Lint＋アーキテクチャの依存の向き。warningも不合格              |
 | `pnpm lint:duplicates` | 製品srcのコード重複率0%を検査                                        |
 | `pnpm lint:similarity` | 関数の構造的類似度90%以上を不合格にする                              |
 | `pnpm format`          | 整形適用                                                             |
@@ -172,6 +173,10 @@ Huskyと直接Git hooksはどちらもローカル検査です。未導入端末
 
 scaffold は仕様策定でこの節の選択肢を人に提示し、基本設計で選ばれた選択肢の規則と強制設定（`architecture/`）を導入します。
 
+導入するのは選んだ1つだけです。`architecture/<選択肢>.mjs` を製品 root の `architecture.mjs` へコピーすると、配布の `eslint.config.mjs` が読み込み、`pnpm lint`（`pnpm check` の Lint 段、commit 前・push 前のフック）が規則を検査します。`architecture.mjs` が無いときは飛ばさず、`Missing architecture.mjs` とコピーの手順（`cp architecture/onion.mjs architecture.mjs`。選択肢は onion だけ）を出して失敗します（黙って検査が効かない状態にしない）。基本設計で選ぶ前から check を通すには、既定の選択肢をコピーしておきます。
+
+組み立て役は `src/main.ts` か `src/index.ts` のどちらか1つです。検査対象は src の JS/TS で、テスト（`tests/**`・`*.test.*`・`*.spec.*`・`__tests__`）は対象外です。import は eslint-import-resolver-typescript が `tsconfig.app.json` の解決どおりに辿ります（拡張子なし・`.js` 付きの両方）。resolver を外すと層を判定できず、すべての import が違反になります（黙って見逃さない）。src 直下の素材（`src/style.css` など）を import すると層の外として拒否されるので、素材は presentation に置きます。例外が要るときは規則を消さず、policy を足して理由をこの README に残します。
+
 ### 選び方
 
 - 汎用 Web は選択肢を設けず、常に **オニオン** を使います。仕様策定では「この型で進める」ことだけを確認します。
@@ -194,13 +199,13 @@ flowchart LR
   application --> domain
 ```
 
-| 層・ファイル          | 置くもの                                                                |
-| --------------------- | ----------------------------------------------------------------------- |
-| `src/domain/`         | 型・値・業務ルール。純粋な関数だけ                                      |
-| `src/application/`    | ユースケース。外部への口（interface）を定義し、domain を呼ぶ            |
-| `src/infrastructure/` | 口の実装（`fetch`・ストレージ・外部パッケージのクライアント）           |
-| `src/presentation/`   | 画面（コンポーネント・DOM 操作・イベント）。画像・CSS などの素材もここ  |
-| `src/main.ts`         | 組み立て役。`index.html` の `<script type="module" src="/src/main.ts">` |
+| 層・ファイル                           | 置くもの                                                                |
+| -------------------------------------- | ----------------------------------------------------------------------- |
+| `src/domain/`                          | 型・値・業務ルール。純粋な関数だけ                                      |
+| `src/application/`                     | ユースケース。外部への口（interface）を定義し、domain を呼ぶ            |
+| `src/infrastructure/`                  | 口の実装（`fetch`・ストレージ・外部パッケージのクライアント）           |
+| `src/presentation/`                    | 画面（コンポーネント・DOM 操作・イベント）。画像・CSS などの素材もここ  |
+| `src/main.ts`（または `src/index.ts`） | 組み立て役。`index.html` の `<script type="module" src="/src/main.ts">` |
 
 | 規則                                                                                                                                        | 区分     |
 | ------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
@@ -209,29 +214,16 @@ flowchart LR
 | application は domain だけを import する（外部パッケージも不可）                                                                            | MUST     |
 | infrastructure・presentation は domain・application・外部パッケージを import できる                                                         | MUST     |
 | presentation は infrastructure を import する（つなぐのは `src/main.ts`）                                                                   | MUST NOT |
-| `src/main.ts` 以外の、層の外の src ファイルを置く・import する                                                                              | MUST NOT |
+| 組み立て役以外の、層の外の src ファイルを置く・import する                                                                                  | MUST NOT |
 
 - 向く: フォーム・一覧・ダッシュボードなど、画面と通信と業務ルールが分かれる Web アプリ全般。
 - 向かない: 1画面だけの使い捨て試作（それでもこの用途では層を省きません）。
 
-強制設定: [architecture/onion.mjs](./architecture/onion.mjs)（eslint-plugin-boundaries と `no-restricted-globals`）。
+強制設定: [architecture/onion.mjs](./architecture/onion.mjs)（eslint-plugin-boundaries と `no-restricted-globals`）。汎用 Web では常にこれを導入します。選んだら製品 root の `architecture.mjs` へコピーします。既存の `architecture.mjs` があれば停止して差分を確認します。
 
-1. `architecture/onion.mjs` を対象プロジェクトの同じパスへコピーします。既存ファイルがあれば停止して差分を確認します。
-2. `eslint.config.mjs` を次の内容にします。既存の設定があれば丸ごと置き換えず、`architecture` の import と末尾の追加だけを統合します。
-3. これで `pnpm lint`（`pnpm check` の Lint 段、commit 前・push 前のフック）が層の規則を検査します。`check` の変更は不要です。
-
-```js
-import { defineConfig } from "eslint/config";
-import { createConfig } from "./eslint.base.mjs";
-import architecture from "./architecture/onion.mjs";
-
-export default defineConfig(
-  createConfig({ environment: "browser" }),
-  architecture,
-);
+```sh
+cp architecture/onion.mjs architecture.mjs
 ```
-
-検査対象は src の JS/TS で、テスト（`tests/**`・`*.test.*`・`*.spec.*`・`__tests__`）は対象外です。import は eslint-import-resolver-typescript が `tsconfig.app.json` の解決どおりに辿ります（拡張子なし・`.js` 付きの両方）。resolver を外すと層を判定できず、すべての import が違反になります（黙って見逃さない）。src 直下の素材（`src/style.css` など）を import すると層の外として拒否されるので、素材は presentation に置きます。例外が要るときは規則を消さず、policy を足して理由をこの README に残します。
 
 ## 公式資料
 

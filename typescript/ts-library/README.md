@@ -8,31 +8,33 @@ npmライブラリ向けの設定一式です。ESMのJSと型定義をdistへ�
 
 表のファイルを対象プロジェクトのルートへ導入します。ドットファイルと.husky内のフックも含みます。READMEは導入手順として読み、コピーは任意です。既存ファイル・symlink・既存.huskyがある場合は停止し、差分と影響を提示して許可を得てください。既存package.jsonやpnpm-workspace.yamlを丸ごと上書きせず、必要な差分を統合します。
 
-| 同じディレクトリのコピー元                         | コピー先（対象プロジェクトのルート基準） |
-| -------------------------------------------------- | ---------------------------------------- |
-| [package.json](./package.json)                     | `package.json`                           |
-| [tsconfig.base.json](./tsconfig.base.json)         | `tsconfig.base.json`                     |
-| [tsconfig.json](./tsconfig.json)                   | `tsconfig.json`                          |
-| [eslint.base.mjs](./eslint.base.mjs)               | `eslint.base.mjs`                        |
-| [eslint.config.mjs](./eslint.config.mjs)           | `eslint.config.mjs`                      |
-| [.jscpd.json](./.jscpd.json)                       | `.jscpd.json`                            |
-| [check-commit.mjs](./check-commit.mjs)             | `check-commit.mjs`                       |
-| [check-similarity.mjs](./check-similarity.mjs)     | `check-similarity.mjs`                   |
-| [quality-sources.mjs](./quality-sources.mjs)       | `quality-sources.mjs`                    |
-| [check-duplicates.mjs](./check-duplicates.mjs)     | `check-duplicates.mjs`                   |
-| [.prettierrc.json](./.prettierrc.json)             | `.prettierrc.json`                       |
-| [.prettierignore](./.prettierignore)               | `.prettierignore`                        |
-| [.editorconfig](./.editorconfig)                   | `.editorconfig`                          |
-| [.gitignore](./.gitignore)                         | `.gitignore`                             |
-| [.node-version](./.node-version)                   | `.node-version`                          |
-| [lint-staged.config.mjs](./lint-staged.config.mjs) | `lint-staged.config.mjs`                 |
-| [pnpm-workspace.yaml](./pnpm-workspace.yaml)       | `pnpm-workspace.yaml`                    |
-| [vitest.config.ts](./vitest.config.ts)             | `vitest.config.ts`                       |
-| [tsconfig.build.json](./tsconfig.build.json)       | `tsconfig.build.json`                    |
-| [clean-dist.mjs](./clean-dist.mjs)                 | `clean-dist.mjs`                         |
-| [.husky/pre-commit](./.husky/pre-commit)           | `.husky/pre-commit`                      |
-| [.husky/pre-push](./.husky/pre-push)               | `.husky/pre-push`                        |
-| [LICENSE](./LICENSE)                               | `LICENSE.lang-boilerplates`              |
+| 同じディレクトリのコピー元                                 | コピー先（対象プロジェクトのルート基準） |
+| ---------------------------------------------------------- | ---------------------------------------- |
+| [package.json](./package.json)                             | `package.json`                           |
+| [tsconfig.base.json](./tsconfig.base.json)                 | `tsconfig.base.json`                     |
+| [tsconfig.json](./tsconfig.json)                           | `tsconfig.json`                          |
+| [eslint.base.mjs](./eslint.base.mjs)                       | `eslint.base.mjs`                        |
+| [eslint.config.mjs](./eslint.config.mjs)                   | `eslint.config.mjs`                      |
+| [.jscpd.json](./.jscpd.json)                               | `.jscpd.json`                            |
+| [check-commit.mjs](./check-commit.mjs)                     | `check-commit.mjs`                       |
+| [check-similarity.mjs](./check-similarity.mjs)             | `check-similarity.mjs`                   |
+| [quality-sources.mjs](./quality-sources.mjs)               | `quality-sources.mjs`                    |
+| [check-duplicates.mjs](./check-duplicates.mjs)             | `check-duplicates.mjs`                   |
+| [.prettierrc.json](./.prettierrc.json)                     | `.prettierrc.json`                       |
+| [.prettierignore](./.prettierignore)                       | `.prettierignore`                        |
+| [.editorconfig](./.editorconfig)                           | `.editorconfig`                          |
+| [.gitignore](./.gitignore)                                 | `.gitignore`                             |
+| [.node-version](./.node-version)                           | `.node-version`                          |
+| [lint-staged.config.mjs](./lint-staged.config.mjs)         | `lint-staged.config.mjs`                 |
+| [pnpm-workspace.yaml](./pnpm-workspace.yaml)               | `pnpm-workspace.yaml`                    |
+| [vitest.config.ts](./vitest.config.ts)                     | `vitest.config.ts`                       |
+| [tsconfig.build.json](./tsconfig.build.json)               | `tsconfig.build.json`                    |
+| [clean-dist.mjs](./clean-dist.mjs)                         | `clean-dist.mjs`                         |
+| [.husky/pre-commit](./.husky/pre-commit)                   | `.husky/pre-commit`                      |
+| [.husky/pre-push](./.husky/pre-push)                       | `.husky/pre-push`                        |
+| 選んだ `architecture/<選択肢>.mjs`（「アーキテクチャ」節） | `architecture.mjs`                       |
+| [depcruise.config.mjs](./depcruise.config.mjs)             | `depcruise.config.mjs`                   |
+| [LICENSE](./LICENSE)                                       | `LICENSE.lang-boilerplates`              |
 
 設定はMITです。ライセンス文・著作権表示を保持してください。LICENSEは既存ライセンスを上書きしないよう、例えばLICENSE.lang-boilerplatesとして保存します。利用プロジェクト自身のライセンスを自動変更しません。
 
@@ -60,7 +62,7 @@ pnpm install --ignore-scripts --engine-strict
 | コマンド               | 内容                                                                 |
 | ---------------------- | -------------------------------------------------------------------- |
 | `pnpm typecheck`       | src・テスト・TS設定の型チェック                                      |
-| `pnpm lint`            | 型情報Lint。warningも不合格                                          |
+| `pnpm lint`            | 型情報Lint＋アーキテクチャの依存の向き＋循環。warningも不合格        |
 | `pnpm lint:duplicates` | 製品srcのコード重複率0%を検査                                        |
 | `pnpm lint:similarity` | 関数の構造的類似度90%以上を不合格にする                              |
 | `pnpm format`          | 整形適用                                                             |
@@ -171,6 +173,10 @@ Huskyと直接Git hooksはどちらもローカル検査です。未導入端末
 
 scaffold は仕様策定でこの節の選択肢を人に提示し、基本設計で選ばれた選択肢の規則と強制設定（`architecture/`）を導入します。
 
+導入するのは選んだ1つだけです。`architecture/<選択肢>.mjs` を製品 root の `architecture.mjs` へコピーすると、配布の `eslint.config.mjs` が読み込み、`pnpm lint`（`pnpm check` の Lint 段、commit 前・push 前のフック）が規則を検査します。`architecture.mjs` が無いときは飛ばさず、`Missing architecture.mjs` とコピーの手順（`cp architecture/single-entry.mjs architecture.mjs`。選択肢は single-entry・core-adapters・multi-entry）を出して失敗します（黙って検査が効かない状態にしない）。基本設計で選ぶ前から check を通すには、既定の選択肢をコピーしておきます。
+
+src の中の import の循環は、どの選択肢でも [depcruise.config.mjs](./depcruise.config.mjs)（dependency-cruiser）が `pnpm lint` で拒否します。検査対象は src の JS/TS で、テスト（`tests/**`・`*.test.*`・`*.spec.*`・`__tests__`）は対象外です。`.js` 付きの import は eslint-import-resolver-typescript で `.ts` へ解決します。resolver を外すと層を判定できず、すべての import が違反になります（黙って見逃さない）。例外が要るときは規則を消さず、policy を足して理由をこの README に残します。
+
 ### 選び方
 
 - 公開する API が1つのまとまりで、利用者は `import { … } from "<パッケージ名>"` だけを使うか → **入口1つ＋internal**（既定。迷ったらこれ）
@@ -196,45 +202,17 @@ flowchart LR
 | ----------------------------------------------------------- | -------- |
 | 公開するものは `src/index.ts` から export する              | MUST     |
 | `src/internal/**` は `src/index.ts` を import する          | MUST NOT |
-| src の中で import を循環させる（型だけの import も含む）    | MUST NOT |
 | `src/index.ts` と `src/internal/` の外に src ファイルを置く | MUST NOT |
+| src の中で import を循環させる（型だけの import も含む）    | MUST NOT |
 
 - 向く: 小〜中規模のライブラリ。公開 API を1か所で見渡したい。
 - 向かない: 実行環境ごとに実装が分かれる、または機能ごとに別々に読み込ませたい。
 
-強制設定: [architecture/single-entry.mjs](./architecture/single-entry.mjs)（eslint-plugin-boundaries）と [architecture/single-entry.depcruise.mjs](./architecture/single-entry.depcruise.mjs)（dependency-cruiser の循環検出）。
+強制設定: [architecture/single-entry.mjs](./architecture/single-entry.mjs)（eslint-plugin-boundaries）。選んだら製品 root の `architecture.mjs` へコピーします。既存の `architecture.mjs` があれば停止して差分を確認します。
 
-1. 2つのファイルを対象プロジェクトの同じパスへコピーします。既存ファイルがあれば停止して差分を確認します。
-2. `eslint.config.mjs` を次の内容にします。既存の設定があれば丸ごと置き換えず、`architecture` の import と末尾の追加だけを統合します。
-3. package.json の `lint` を `"lint": "eslint . --max-warnings 0 && depcruise src --config architecture/single-entry.depcruise.mjs"` にします。`pnpm lint`（`pnpm check` の Lint 段、commit 前・push 前のフック）が層の規則と循環を検査します。`check` の変更は不要です。
-
-```js
-import { createConfig } from "./eslint.base.mjs";
-import architecture from "./architecture/single-entry.mjs";
-
-export default [
-  ...createConfig({
-    environment: "node",
-    testFiles: [
-      "tests/**/*.{test,spec}.{ts,mts,cts}",
-      "src/**/*.{test,spec}.{ts,mts,cts}",
-      "src/**/__tests__/**/*.{ts,mts,cts}",
-    ],
-  }),
-  {
-    files: ["src/**/*.{ts,mts,cts}"],
-    ignores: [
-      "src/**/*.test.{ts,mts,cts}",
-      "src/**/*.spec.{ts,mts,cts}",
-      "src/**/__tests__/**",
-    ],
-    rules: { "@typescript-eslint/explicit-module-boundary-types": "error" },
-  },
-  ...architecture,
-];
+```sh
+cp architecture/single-entry.mjs architecture.mjs
 ```
-
-検査対象は src の JS/TS で、併置テスト（`*.test.*`・`*.spec.*`・`__tests__`）と `tests/**` は対象外です。`.js` 付きの import は eslint-import-resolver-typescript で `.ts` へ解決します。resolver を外すと層を判定できず、すべての import が違反になります（黙って見逃さない）。例外が要るときは規則を消さず、policy を足して理由をこの README に残します。
 
 ### コア＋実行環境アダプター
 
@@ -264,6 +242,7 @@ flowchart LR
 | アダプター同士は import する                                                                             | MUST NOT |
 | `src/index.ts` は core と外部パッケージ以外を import する                                                | MUST NOT |
 | `src/index.ts`・core・adapters の外に src ファイルを置く                                                 | MUST NOT |
+| src の中で import を循環させる（型だけの import も含む）                                                 | MUST NOT |
 
 package.json の exports にアダプターのサブパスを足します（例。tsconfig.build.json の出力先 `dist` に合わせます）。
 
@@ -282,32 +261,10 @@ package.json の exports にアダプターのサブパスを足します（例�
 - 向く: 同じ処理を Node・ブラウザ・エッジなど複数の環境で使わせたい。
 - 向かない: 1つの環境でしか動かない（入口1つ＋internal で足りる）。
 
-強制設定: [architecture/core-adapters.mjs](./architecture/core-adapters.mjs)。導入手順は入口1つ＋internal の 1・2 と同じで、コピーするファイルと `eslint.config.mjs` を次にします。`lint` の変更は不要です。
+強制設定: [architecture/core-adapters.mjs](./architecture/core-adapters.mjs)。選んだら製品 root の `architecture.mjs` へコピーします。既存の `architecture.mjs` があれば停止して差分を確認します。
 
-```js
-import { createConfig } from "./eslint.base.mjs";
-import architecture from "./architecture/core-adapters.mjs";
-
-export default [
-  ...createConfig({
-    environment: "node",
-    testFiles: [
-      "tests/**/*.{test,spec}.{ts,mts,cts}",
-      "src/**/*.{test,spec}.{ts,mts,cts}",
-      "src/**/__tests__/**/*.{ts,mts,cts}",
-    ],
-  }),
-  {
-    files: ["src/**/*.{ts,mts,cts}"],
-    ignores: [
-      "src/**/*.test.{ts,mts,cts}",
-      "src/**/*.spec.{ts,mts,cts}",
-      "src/**/__tests__/**",
-    ],
-    rules: { "@typescript-eslint/explicit-module-boundary-types": "error" },
-  },
-  ...architecture,
-];
+```sh
+cp architecture/core-adapters.mjs architecture.mjs
 ```
 
 ### 機能別の複数入口
@@ -339,38 +296,17 @@ flowchart LR
 | shared は機能を import する                                | MUST NOT |
 | `src/index.ts` は機能の `index.ts` 以外を import する      | MUST NOT |
 | `src/index.ts`・features・shared の外に src ファイルを置く | MUST NOT |
+| src の中で import を循環させる（型だけの import も含む）   | MUST NOT |
 
 package.json の exports に機能ごとのサブパスを足します（例: `"./parse": { "types": "./dist/features/parse/index.d.ts", "import": "./dist/features/parse/index.js" }`）。
 
 - 向く: 独立したユーティリティ群。利用者が必要な機能だけを読み込み、バンドルを小さくしたい。
 - 向かない: 機能同士が密に連携する（入口1つ＋internal が合う）。
 
-強制設定: [architecture/multi-entry.mjs](./architecture/multi-entry.mjs)。導入手順は入口1つ＋internal の 1・2 と同じで、コピーするファイルと `eslint.config.mjs` を次にします。`lint` の変更は不要です。
+強制設定: [architecture/multi-entry.mjs](./architecture/multi-entry.mjs)。選んだら製品 root の `architecture.mjs` へコピーします。既存の `architecture.mjs` があれば停止して差分を確認します。
 
-```js
-import { createConfig } from "./eslint.base.mjs";
-import architecture from "./architecture/multi-entry.mjs";
-
-export default [
-  ...createConfig({
-    environment: "node",
-    testFiles: [
-      "tests/**/*.{test,spec}.{ts,mts,cts}",
-      "src/**/*.{test,spec}.{ts,mts,cts}",
-      "src/**/__tests__/**/*.{ts,mts,cts}",
-    ],
-  }),
-  {
-    files: ["src/**/*.{ts,mts,cts}"],
-    ignores: [
-      "src/**/*.test.{ts,mts,cts}",
-      "src/**/*.spec.{ts,mts,cts}",
-      "src/**/__tests__/**",
-    ],
-    rules: { "@typescript-eslint/explicit-module-boundary-types": "error" },
-  },
-  ...architecture,
-];
+```sh
+cp architecture/multi-entry.mjs architecture.mjs
 ```
 
 ## 公式資料

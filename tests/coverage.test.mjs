@@ -51,8 +51,8 @@ test("commit gate rejects a staged change that drops coverage below 90%", async 
   git("add", ".");
   git("commit", "-m", "valid baseline");
   const before = git("rev-parse", "HEAD");
-  await write(root, "src/extra.ts", UNTESTED);
-  git("add", "src/extra.ts");
+  await write(root, "src/internal/extra.ts", UNTESTED);
+  git("add", "src/internal/extra.ts");
   const result = runAt(root, "git", ["commit", "-m", "untested code"]);
   assert.notEqual(result.status, 0, result.output);
   assert.match(result.output, THRESHOLD_MISS);

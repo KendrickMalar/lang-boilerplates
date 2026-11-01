@@ -353,6 +353,12 @@ export const architectureCases = [
       { ...stray, path: "src/adapters/loose.ts" },
       stray,
     ],
+    cycle: {
+      "src/core/format.ts":
+        'import { greet } from "./greet.js";\nexport function format(name: string): string {\n  return greet + name;\n}\n',
+      "src/core/greet.ts":
+        'import { format } from "./format.js";\nexport const greet = format.name.length > 99 ? "" : "Hello, ";\n',
+    },
     entryViolation: dependency(
       "src/index.ts",
       'export { format } from "./core/format.js";\nexport { save } from "./adapters/node/index.js";\n',
@@ -384,6 +390,12 @@ export const architectureCases = [
       ),
       stray,
     ],
+    cycle: {
+      "src/features/parse/split.ts":
+        'import { trim } from "../../shared/text.js";\nimport { separator } from "./separator.js";\nexport function split(value: string): string[] {\n  return value.split(separator()).map(trim);\n}\n',
+      "src/features/parse/separator.ts":
+        'import { split } from "./split.js";\nexport function separator(): string {\n  return split.length > 9 ? ";" : ",";\n}\n',
+    },
     entryViolation: dependency(
       "src/index.ts",
       'export { split } from "./features/parse/split.js";\n',
