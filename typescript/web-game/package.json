@@ -28,7 +28,9 @@
     "eslint-plugin-regexp": "3.3.1",
     "@types/three": "0.186.0",
     "@playwright/test": "1.64.1",
-    "eslint-plugin-playwright": "2.12.1"
+    "eslint-plugin-playwright": "2.12.1",
+    "eslint-plugin-boundaries": "7.4.0",
+    "eslint-import-resolver-typescript": "4.4.5"
   },
   "scripts": {
     "dev": "vite",
