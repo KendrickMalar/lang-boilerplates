@@ -1,4 +1,4 @@
-"""Real-tool gates for the Rust game-server leaves (isolated toolchain, offline)."""
+"""Real-tool gates for the Rust server leaves (isolated toolchain, offline)."""
 import os
 import subprocess
 import unittest
@@ -52,13 +52,13 @@ def with_items(items: str) -> str:
     return f"{head}{items.strip()}\n\n#[cfg(test)]{tests}"
 
 
-class RealtimeLeaf(unittest.TestCase):
-    """Fixture helpers for one game leaf (no tests of its own); subclasses set `leaf`."""
+class GameLeaf(unittest.TestCase):
+    """Fixture helpers for one server leaf (no tests of its own); subclasses set `leaf`."""
 
     # Fixture directory prefix. None: the test name. Set a neutral one when a needle could
     # otherwise match the fixture path that tools echo (e.g. `Compiling core v0.1.0 (<path>)`).
     prefix: str | None = None
-    leaf = "game-realtime"
+    leaf = "game"
 
     def project(self, lib: str = CLEAN, *, root: Path | None = None, **crate) -> Path:
         root = root or copy_leaf(self.leaf,
@@ -81,7 +81,7 @@ class RealtimeLeaf(unittest.TestCase):
         self.assertIn(needle, result.stderr)
 
 
-class RealtimeCommitGateTests(RealtimeLeaf):
+class GameCommitGateTests(GameLeaf):
     def test_clean_workspace_without_dependencies_passes(self):
         result = self.commit(self.project())
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -93,7 +93,7 @@ class RealtimeCommitGateTests(RealtimeLeaf):
 
     def test_internal_path_dependency_passes(self):
         # Versionless path deps between the workspace's own crates are not banned wildcards.
-        root = copy_leaf("game-realtime", "internal_path_dependency")
+        root = copy_leaf("game", "internal_path_dependency")
         write_crate(root, "rules", CLEAN)
         lib = CLEAN.replace("left.saturating_add(right)", "rules::add(left, right)")
         result = self.commit(self.project(lib, root=root, deps='rules = { path = "../rules" }'))
@@ -199,7 +199,7 @@ pub fn wait() {
         self.assert_rejected(result, "member must set [lints] workspace = true")
 
     def test_unused_dependency_rejected(self):
-        root = copy_leaf("game-realtime", "unused_dependency")
+        root = copy_leaf("game", "unused_dependency")
         dep = write_fake_crate(root, "helper", "//! Stand-in crate.\n")
         root = self.project(root=root, deps=dep)
         result = self.commit(root)
@@ -280,7 +280,7 @@ COVERAGE = "error: line coverage below 90% (--fail-under-lines 90)"
 PUSH_STAGES = ["format", "lint", "deps", "coverage", "advisories", "build"]
 
 
-class RealtimePushGateTests(RealtimeLeaf):
+class GamePushGateTests(GameLeaf):
     prefix = "push"
 
     def push(self, root: Path, *, online: bool = False,
@@ -383,7 +383,7 @@ class RealtimePushGateTests(RealtimeLeaf):
         self.assertIn("Finished `release` profile", result.stderr)
 
 
-class RealtimeRuleTests(RealtimeLeaf):
+class GameDeterminismRuleTests(GameLeaf):
     def lint(self, items: str) -> subprocess.CompletedProcess[str]:
         # Lint stage only: rule fixtures add untested items that the commit coverage floor rejects.
         return run_game(["sh", "scripts/check.sh", "lint"], self.project(with_items(items)))
@@ -511,7 +511,7 @@ pub fn get(_: &str) {}
 BANNED_LIB = "pub fn encode() {}\n"
 
 
-class FakeDependencyLeaf(RealtimeLeaf):
+class FakeDependencyLeaf(GameLeaf):
     """Rule checks that need a dependency: a path-only stand-in crate keeps them offline."""
 
     prefix = "fakedep"
@@ -523,7 +523,7 @@ class FakeDependencyLeaf(RealtimeLeaf):
 
 
 class AsyncLockRules:
-    """await_holding_lock and the push gate, shared by the room and social leaves."""
+    """await_holding_lock and the push gate, shared by the game, web-game, and web leaves."""
 
     def lint(self, items: str) -> subprocess.CompletedProcess[str]:
         # Lint stage only: rule fixtures add untested items that the commit coverage floor rejects.
@@ -561,8 +561,10 @@ pub async fn released(lock: &std::sync::Mutex<u32>) -> u32 {
         self.assertEqual(positions, sorted(positions))
 
 
-class RoomRuleTests(AsyncLockRules, FakeDependencyLeaf):
-    leaf = "game-room"
+class GameAsyncRuleTests(AsyncLockRules, FakeDependencyLeaf):
+    """Room rules merged into the game leaf (former game-room)."""
+
+    leaf = "game"
 
     def test_unbounded_channel_rejected(self):
         self.assert_rejected(self.lint_with("tokio", TOKIO, '''
@@ -581,8 +583,8 @@ pub fn queue() {
 '''), "#disallowed_methods")
 
 
-class SocialRuleTests(AsyncLockRules, FakeDependencyLeaf):
-    leaf = "game-social"
+class WebGameRuleTests(AsyncLockRules, FakeDependencyLeaf):
+    leaf = "web-game"
 
     def test_raw_sqlx_query_rejected(self):
         for call in ("query", "query_as"):
@@ -606,18 +608,18 @@ pub fn call() {{
 }}
 '''), "#disallowed_methods")
 
-    def test_social_without_sqlx_passes(self):
+    def test_without_sqlx_passes(self):
         root = self.project()
         self.assertFalse((root / ".sqlx").exists())
         result = self.commit(root)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def test_social_sets_sqlx_offline(self):
+    def test_sets_sqlx_offline(self):
         result = self.commit(self.project())
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("env: SQLX_OFFLINE=true\n", result.stdout)
 
-    def test_social_keeps_caller_sqlx_offline(self):
+    def test_keeps_caller_sqlx_offline(self):
         root = self.project()
         env = game_env(root)
         env["SQLX_OFFLINE"] = "false"
@@ -627,9 +629,15 @@ pub fn call() {{
         self.assertIn("env: SQLX_OFFLINE=false\n", result.stdout)
 
 
-class RoomAndSocialTests(unittest.TestCase):
-    def test_room_and_social_clean_commit_passes(self):
-        for leaf in ("game-room", "game-social"):
+class WebRuleTests(WebGameRuleTests):
+    """The generic HTTP API leaf has the same settings as web-game."""
+
+    leaf = "web"
+
+
+class ServerLeafTests(unittest.TestCase):
+    def test_api_leaves_clean_commit_passes(self):
+        for leaf in ("web-game", "web"):
             with self.subTest(leaf=leaf):
                 root = copy_leaf(leaf, "cleancommit")
                 write_crate(root, "core", CLEAN)
@@ -665,7 +673,7 @@ pub fn call() {{
                 self.assert_banned(leaf, "bincode")
 
     def test_leaf_specific_ban_rejected(self):
-        for leaf, crate in (("game-room", "actix"), ("game-social", "native-tls")):
+        for leaf, crate in (("game", "actix"), ("web-game", "native-tls"), ("web", "native-tls")):
             with self.subTest(leaf=leaf, crate=crate):
                 self.assert_banned(leaf, crate)
 

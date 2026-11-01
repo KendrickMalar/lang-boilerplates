@@ -57,20 +57,14 @@ suite を自動導入/自動実行しません。tool や依存は対象・保�
 ```sh
 pnpm test:native:static
 pnpm test:native:quality # 設定の実効検証。既存Clippy/SwiftLint/swift-format/luau-lspのみ使用
-pnpm test:native:rust
-pnpm test:native:rust-game # game-realtime / game-room / game-social。隔離した Rust 1.99.1 と各 tool を使用
+pnpm test:native:rust-game # rust/game・rust/web-game・rust/web。隔離した Rust 1.99.1 と各 tool を使用
 pnpm test:native:macos
 pnpm test:native:roblox
 NATIVE_IOS_TEST_DESTINATION='platform=iOS Simulator,id=APPROVED-UUID' pnpm test:native:ios
 ```
 
 明示した Python test modules を実行し、test 0件の discovery を使いません。
-Rust は Git 管理外の承認済み lock/依存審査・実 build/test record が必要です。
-Rust hook fixture は capacity 制約のため `NATIVE_HOOK_RUST_FIXTURE=fixture-50ncrnnd`
-という既存所有 fixture の再利用を明示承認した環境だけで実行します。不在/未承認は非0。
-新規検証環境の取得/fixture 方針は別途相談し、既存 fixture を勝手に上書きしません。
-この capacity 制約下では新 Rust target を作る通常 runtime suite をそのまま起動せず、
-承認済み所有 fixture を再利用する統合 runner を使います。
+Rust は Git 管理外の隔離 toolchain（`.verification/native/rust-game/`）と固定版の cargo subcommand が必要で、自動導入しません。
 hook は通常 working-tree check script を検査します。未所有変更を除外する検証に限り、
 承認済み full SHA を `NATIVE_HOOK_CHECK_REF` に明示指定できます。選択ref/script hashを
 記録し、不正/欠落refは非0。この固定refの成功は working-tree版の承認を意味しません。
@@ -78,18 +72,18 @@ Swift は選択 Xcode と SwiftLint が必要で、iOS は許可済み具体的 
 ローカル bare remote だけへ hook 試験 push し、global hooksPath/フックを変更しません。
 Native suite 未実行は TypeScript 成功と区別します。
 
-実検証範囲は macOS Cargo/backend ACL mock/native build、macOS app test/build、
+実検証範囲は macOS の Rust サーバー leaf の check（fixture crate）、macOS app test/build、
 iOS27.0 iPhone17/iPad(A16) Simulator app test/build です。Package-only/mock 成功を
 製品アプリ合格としません。Windows/Linux native/PowerShell は未実行、iOS17 runtime/
 実機/UI flows/製品署名・release/archive/公開は未検証です。全 OS 合格とは宣言しません。
 
 ## 範囲
 
-- TypeScript: Node/CLI、汎用Web、ブラウザ3Dゲーム（Three.js＋Rapier）、npmライブラリ。
-- Rust: Tauri desktop の backend（Rust1.92.0/edition2024/Tauri2.12.2/tauri-build2.7.1）。frontend は利用側で接続。ゲームサーバー用に game-realtime（サーバー権威の対戦）/ game-room（ルーム制・WebSocket）/ game-social（ソシャゲ型 HTTP API）の品質設定（Rust1.99.1/edition2024、依存・source なし）。
+- TypeScript: CLI／Nodeアプリ（cli）、汎用Web（web）、ブラウザゲーム（web-game。2D・3D。3D は Three.js＋Rapier）、npmライブラリ（ts-library）。
+- Rust: サーバー用の品質設定（Rust1.99.1/edition2024、依存・source なし）。game（リアルタイム対戦・ルーム制（WebSocket）のゲームサーバー）/ web-game（ソシャゲ型の Web ゲーム API）/ web（一般の HTTP API）。
 - Swift: 標準 Xcode app 用、Swift6 mode/macOS15/iOS17/SwiftLint0.65.1。xcconfig の実効接続を確認。
-- Roblox: Rojo でファイル管理するゲーム用（Rojo7.7.1/StyLua2.5.2/Selene0.32.0/luau-lsp1.69.0/Lune0.10.5/Wally0.3.2 を Rokit で固定）。macOS 実検証、Studio 実同期は未検証。
-- Godot: モバイルゲーム用（Godot4.7.2/gdtoolkit4.5.0）。型付き GDScript を強制し、ヘッドレスで検査とテスト。asuka で手動確認、実ツール suite なし。
+- Roblox: Rojo でファイル管理するゲーム用（roblox-game）（Rojo7.7.1/StyLua2.5.2/Selene0.32.0/luau-lsp1.69.0/Lune0.10.5/Wally0.3.2 を Rokit で固定）。macOS 実検証、Studio 実同期は未検証。
+- Godot: モバイルゲーム用（mobile-game、Godot4.7.2/gdtoolkit4.5.0）。型付き GDScript を強制し、ヘッドレスで検査とテスト。asuka で手動確認、実ツール suite なし。
 - Blender: 3D モデルをコードで作る用（Blender5.2.2 LTS/ruff0.17.0/glTF-Transform4.5.1）。glTF 書き出しと検査。asuka で手動確認、実ツール suite なし。
 - 製品 source/frontend/fixture/cache/秘密情報/署名 asset は配布しません。
 - CI、フレームワーク固有設定、自動コピーCLI、npm公開は含みません。

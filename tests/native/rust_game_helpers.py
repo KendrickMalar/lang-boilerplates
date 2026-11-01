@@ -1,4 +1,4 @@
-"""Git-ignored, isolated toolchain and fixtures for the Rust game-server leaves."""
+"""Git-ignored, isolated toolchain and fixtures for the Rust server leaves."""
 import json
 import os
 import re
@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = ROOT / ".verification/native/rust-game"
-LEAVES = ("game-realtime", "game-room", "game-social")
+LEAVES = ("game", "web-game", "web")
 
 
 def game_env(cwd: Path, *, online: bool = False) -> dict[str, str]:

@@ -5,7 +5,7 @@ import { rename, mkdir, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { ROOT, copyPreset, write, expectResult, runAt } from "./helpers.mjs";
 test("library emits only product JavaScript and type declarations with valid exports", async () => {
-  const root = await copyPreset("library");
+  const root = await copyPreset("ts-library");
   await expectResult(root, ["check"], 0);
   const files = readdirSync(join(root, "dist"));
   assert.ok(files.includes("index.js"));
@@ -26,7 +26,7 @@ test("library emits only product JavaScript and type declarations with valid exp
 });
 
 test("library executes colocated tests instead of silently ignoring them", async () => {
-  const root = await copyPreset("library");
+  const root = await copyPreset("ts-library");
   await write(
     root,
     "src/internal.test.ts",
@@ -35,7 +35,7 @@ test("library executes colocated tests instead of silently ignoring them", async
   await expectResult(root, ["test"], 1, /colocated failing assertion/);
 });
 test("library recursively excludes colocated tests from emitted distribution", async () => {
-  const root = await copyPreset("library");
+  const root = await copyPreset("ts-library");
   const source =
     'import { expect, test } from "vitest";\ntest("colocated", () => { expect(1).toBe(1); });\n';
   await write(root, "src/internal.test.ts", source);
@@ -56,7 +56,7 @@ test("library recursively excludes colocated tests from emitted distribution", a
 });
 
 test("library rebuild drops outputs for source moved out of the project", async () => {
-  const root = await copyPreset("library");
+  const root = await copyPreset("ts-library");
   await write(root, "src/obsolete.ts", "export const oldValue = 1;\n");
   await expectResult(root, ["build"], 0);
   assert.ok(readdirSync(join(root, "dist")).includes("obsolete.js"));
@@ -73,7 +73,7 @@ test("library rebuild drops outputs for source moved out of the project", async 
 });
 
 test("library build refuses symlink dist and preserves its target", async () => {
-  const root = await copyPreset("library");
+  const root = await copyPreset("ts-library");
   await mkdir(join(root, "protected"));
   await write(root, "protected/keep.txt", "preserve\n");
   await symlink(join(root, "protected"), join(root, "dist"), "dir");
@@ -84,7 +84,7 @@ test("library build refuses symlink dist and preserves its target", async () => 
   );
 });
 test("library build refuses a non-directory dist without removing it", async () => {
-  const root = await copyPreset("library");
+  const root = await copyPreset("ts-library");
   await write(root, "dist", "not generated output\n");
   await expectResult(root, ["build"], 1, /not a normal directory/);
   assert.equal(
@@ -94,7 +94,7 @@ test("library build refuses a non-directory dist without removing it", async () 
 });
 
 test("library cleaner refuses invocation outside its project root", async () => {
-  const root = await copyPreset("library");
+  const root = await copyPreset("ts-library");
   await expectResult(root, ["build"], 0);
   const result = runAt(ROOT, "node", [join(root, "clean-dist.mjs")]);
   assert.notEqual(result.status, 0, result.output);

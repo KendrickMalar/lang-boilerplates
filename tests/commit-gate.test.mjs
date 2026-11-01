@@ -11,7 +11,7 @@ function git(root, ...args) {
 }
 
 test("commit rejects type errors, failing tests, untracked and unstaged changes without changing HEAD", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   git(root, "init", "-b", "main");
   const husky = runAt(root, "pnpm", ["exec", "husky"]);
   assert.equal(husky.status, 0, husky.output);
@@ -83,7 +83,7 @@ for (const mode of ["unstaged", "index"]) {
   test(
     "commit detects " + mode + " changes made by check without undoing them",
     async () => {
-      const root = await copyPreset("node");
+      const root = await copyPreset("cli");
       const pkg = JSON.parse(
         await readFile(join(root, "package.json"), "utf8"),
       );
@@ -125,7 +125,7 @@ for (const mode of ["unstaged", "index"]) {
 }
 
 test("structural clones that pass jscpd cannot be committed", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   git(root, "init", "-b", "main");
   const installed = runAt(root, "pnpm", ["exec", "husky"]);
   assert.equal(installed.status, 0, installed.output);
@@ -163,7 +163,7 @@ test("structural clones that pass jscpd cannot be committed", async () => {
 
 for (const flag of ["--assume-unchanged", "--skip-worktree"]) {
   test("commit refuses hidden working-tree changes via " + flag, async () => {
-    const root = await copyPreset("node");
+    const root = await copyPreset("cli");
     git(root, "init", "-b", "main");
     const installed = runAt(root, "pnpm", ["exec", "husky"]);
     assert.equal(installed.status, 0, installed.output);

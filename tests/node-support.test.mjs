@@ -12,10 +12,10 @@ const semver = pluginRequire("semver");
 test("all project manifests describe the actually supported Node release lines", () => {
   for (const relative of [
     "package.json",
-    "typescript/node/package.json",
+    "typescript/cli/package.json",
     "typescript/web/package.json",
-    "typescript/web-game-3d/package.json",
-    "typescript/library/package.json",
+    "typescript/web-game/package.json",
+    "typescript/ts-library/package.json",
   ]) {
     const pkg = JSON.parse(readFileSync(join(ROOT, relative), "utf8"));
     for (const [version, supported] of [

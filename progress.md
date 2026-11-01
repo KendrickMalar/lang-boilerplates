@@ -234,3 +234,24 @@
   - PASS blender-zero-tests (exit 1)
   - PASS godot-wrong-version (exit 1)
   - PASS blender-wrong-ruff (exit 1)
+
+## 用途の再編（2026-11-01）
+
+この台帳の上の記録と `docs/` の計画・設計・検証記録は、当時のディレクトリ名のまま残す（履歴のため書き換えない）。
+旧名と新名の対応は次のとおり。
+
+| 旧 | 新 |
+| --- | --- |
+| `typescript/node` | `typescript/cli` |
+| `typescript/web-game-3d` | `typescript/web-game`（2D・3D。3D のときだけ Three.js＋Rapier） |
+| `typescript/library` | `typescript/ts-library` |
+| `rust/game-realtime`・`rust/game-room` | `rust/game`（realtime を土台に room の規則を統合） |
+| `rust/game-social` | `rust/web-game` |
+| （新設） | `rust/web`（web-game から設定はそのまま、README のソシャゲ固有の記述を除いた一般の HTTP API 用） |
+| `rust/tauri` | 削除（`test:native:rust`・`test_rust.py`・`test_static_rust.py`・`rust_helpers.py`・`RustHookTests` も削除） |
+| `godot/mobile` | `godot/mobile-game` |
+| `roblox/rojo` | `roblox/roblox-game` |
+
+- `tests/game3d*.mjs` は `tests/web-game*.mjs` に改名。
+- `test:native:quality` の Rust 規則試験は `rust/tauri` の lint 表から `rust/web` の lint 表に切り替えた（既存の Rust 1.92.0 で実行）。
+- 統合後の `rust/game` と新設の `rust/web` は、隔離 Rust 1.99.1 が無いため `test:native:rust-game` を未実行。

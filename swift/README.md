@@ -12,5 +12,5 @@ product signing/release verification.
 有効化手順があります。コピーだけで hooksPath を変更しません。既存フックを
 読み取り確認し、変更の別承認後のみ project-local に有効化します。
 保守 suite は repository root の `pnpm test:native:static` と言語/platform 別の
-`test:native:rust` / `test:native:macos` / `test:native:ios` から明示実行します。
+`test:native:macos` / `test:native:ios` から明示実行します。
 未実行 native suite は既存 TypeScript suite の成功と分けて記録します。

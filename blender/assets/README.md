@@ -59,8 +59,8 @@ def build() -> None:
 blender -b --factory-startup --python-exit-code 1 --python scripts/build.py -- --out build
 ```
 
-`build/<name>.glb` ができます。[Godot の設定](https://github.com/KendrickMalar/lang-boilerplates/blob/main/godot/mobile/README.md)
-（godot/mobile）と組で使う場合は、ゲーム側の `assets/` などへコピーしてください（Godot は `.glb` を
+`build/<name>.glb` ができます。[Godot の設定](https://github.com/KendrickMalar/lang-boilerplates/blob/main/godot/mobile-game/README.md)
+（godot/mobile-game）と組で使う場合は、ゲーム側の `assets/` などへコピーしてください（Godot は `.glb` を
 そのまま取り込みます）。
 
 ## チェック
@@ -144,7 +144,7 @@ Husky は Git root に1つだけ配置します。各 leaf の言語設定・scr
 ```
 
 各 check.sh は自身の leaf に移動します。どちらかが失敗すれば両フックとも非0になります。
-Tauri + TypeScript では root の `check` に backend と frontend の全体検査を漏れなく登録します。
+Rust サーバー + TypeScript frontend では root の `check` にサーバーと frontend の全体検査を漏れなく登録します。
 frontend側 package.json の check 名と root の集約 check 名を分け、相互呼び出しの再帰を避けます。
 Roblox の Git root / project root の不一致は既存 guard の対象外なので、guard を外して混在対応しません。
 

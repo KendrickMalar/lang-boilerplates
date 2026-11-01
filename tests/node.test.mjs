@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { copyPreset, write, runAt, expectResult } from "./helpers.mjs";
 
 test("Node preset checks, builds and executes copied output", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   await expectResult(root, ["check"], 0);
   const result = runAt(root, "node", [
     "--input-type=module",
@@ -28,7 +28,7 @@ for (const [name, source, diagnostic] of [
   ["DOM API in Node", "export const element = document.body;\n", /document/],
 ]) {
   test("Node typecheck rejects " + name, async () => {
-    const root = await copyPreset("node");
+    const root = await copyPreset("cli");
     await write(root, "src/bad.ts", source);
     await expectResult(root, ["typecheck"], 1, diagnostic);
   });
@@ -46,18 +46,18 @@ for (const [name, source, diagnostic] of [
   ],
 ]) {
   test("typed lint rejects " + name, async () => {
-    const root = await copyPreset("node");
+    const root = await copyPreset("cli");
     await write(root, "src/bad.ts", source);
     await expectResult(root, ["lint"], 1, diagnostic);
   });
 }
 test("format check rejects unformatted product code", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   await write(root, "src/bad.ts", "export const x=1");
   await expectResult(root, ["format:check"], 1, /Code style issues/);
 });
 test("test command rejects wrong assertions", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   await write(
     root,
     "tests/index.test.ts",
@@ -66,17 +66,17 @@ test("test command rejects wrong assertions", async () => {
   await expectResult(root, ["test"], 1, /AssertionError|expected/);
 });
 test("test command rejects missing tests", async () => {
-  const root = await copyPreset("node", { tests: false });
+  const root = await copyPreset("cli", { tests: false });
   await expectResult(root, ["test"], 1, /No test files found/);
 });
 test("check stops after type failure before build", async () => {
-  const root = await copyPreset("node");
+  const root = await copyPreset("cli");
   await write(root, "src/bad.ts", 'export const value: number = "bad";\n');
   const result = await expectResult(root, ["check"], 1, /TS2322/);
   assert.doesNotMatch(result.output, /> tsc -p tsconfig.build.json/);
 });
 
-for (const preset of ["node", "web", "library"]) {
+for (const preset of ["cli", "web", "ts-library"]) {
   test(
     preset + " config-only copy is not accepted as a verified product",
     async () => {
