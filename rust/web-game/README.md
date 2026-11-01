@@ -22,6 +22,8 @@ lint は最大級に厳しくしています（pedantic・nursery・cargo を de
 | [.editorconfig](.editorconfig) | `.editorconfig` |
 | [.gitignore](.gitignore) | `.gitignore` |
 | [scripts/check.sh](scripts/check.sh) | `scripts/check.sh` |
+| [scripts/check-architecture.sh](scripts/check-architecture.sh) | `scripts/check-architecture.sh`（deps 段から呼ぶ） |
+| `architecture/<選択肢>/` の2ファイル | `architecture/`（基本設計で選んだ1つだけ。[アーキテクチャ](#アーキテクチャ)） |
 | [check-commit.mjs](check-commit.mjs) | `check-commit.mjs` |
 | [package.json](package.json) / [pnpm-workspace.yaml](pnpm-workspace.yaml) / [.node-version](.node-version) | 同名 |
 | [.husky/pre-commit](.husky/pre-commit) / [.husky/pre-push](.husky/pre-push) | 同名 |
@@ -93,7 +95,7 @@ tool 不足・版違い・source なし・Cargo.lock なし・テスト0件は�
 | --- | --- | --- |
 | format | `cargo fmt --all --check` | なし |
 | lint | 全 member の `[lints] workspace = true` の検査、`cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | なし |
-| deps | `cargo shear`、`cargo deny --offline check bans licenses sources` | なし |
+| deps | `cargo shear`、`cargo deny --offline check bans licenses sources`、`sh scripts/check-architecture.sh`（依存の向き。`architecture/layers.conf` が無ければ飛ばす） | なし |
 | test | `cargo nextest run --workspace --locked --no-tests=fail`、`cargo test --doc --workspace --locked`（library target が無いときは doctest を飛ばす）。単独実行用で、commit・push には含まない | なし |
 | coverage | `cargo llvm-cov nextest --workspace --locked --no-tests=fail --fail-under-lines "$line_floor"`（`line_floor=90`）のあと、test 段と同じ doctest | なし |
 | advisories | `cargo deny check advisories`（RustSec の advisory DB を取得） | **あり** |
@@ -190,6 +192,95 @@ crate を公開する（`publish` を外す）ときは、`description`・`licen
 - ban: `bincode`（RUSTSEC-2025-0141）、`fred`、`poem`、`openssl`、`openssl-sys`、`native-tls`（rustls に限定）。crates.io 以外の registry と git 依存は拒否します。
 - `[graph] targets` は書いていません。デプロイ先に合わせて、例えば `targets = ["x86_64-unknown-linux-gnu"]` を足します。
 
+## アーキテクチャ
+
+scaffold は仕様策定でこの節の選択肢を人に示し、基本設計で選ばれた選択肢の依存規則と強制設定（`architecture/<選択肢>/`）を導入します。
+強制の仕組みは一般の HTTP API（rust/web）と同じです。どの選択肢もクレート分割で作り（1クレート内のモジュール単位は stable の道具では強制できない）、選んだディレクトリの中身をプロジェクト root の `architecture/` へコピーすると有効になります（例: `architecture/hexagonal/layers.conf` → `architecture/layers.conf`）。
+
+- `layers.conf`: `<crate> uses <crate>...` は直接依存してよい workspace のクレートの許可リスト、`<crate> never <crate>...` は推移依存も含めて現れてはいけないクレートです。workspace の全クレートに `uses` 行が要ります。
+- `deny.toml`: cargo-deny の `[bans]` の `wrappers` で、axum・sqlx などを直接使ってよいクレートを決めます。ルートの [deny.toml](deny.toml) とは別の2回目の cargo-deny として実行します。
+- [scripts/check-architecture.sh](scripts/check-architecture.sh) が両方を検査し、[scripts/check.sh](scripts/check.sh) の deps 段から呼ばれます。`architecture/layers.conf` が無いときは `architecture: skipped (no architecture/layers.conf)` と出して飛ばします。dev-dependencies は検査しません。
+
+### 選び方
+
+- ガチャ・報酬・育成など、マスターデータに基づく規則が多いか → はい: 軽ヘキサゴナル＋master
+- ほぼ全ての API が「1人のプレイヤーの状態を読み、変え、保存する」形か → はい: プレイヤー単位の読込・純粋変更・保存
+- 迷ったら軽ヘキサゴナル（既定）にします。
+
+### 軽ヘキサゴナル（既定）
+
+rust/web の軽ヘキサゴナルに、マスターデータの `master` クレートを `domain` と同列に足したものです。
+
+```mermaid
+flowchart LR
+    server --> api
+    server --> infra
+    server --> app
+    server --> domain
+    server --> master
+    api --> app
+    api --> domain
+    api --> master
+    infra --> app
+    infra --> domain
+    infra --> master
+    app --> domain
+    app --> master
+    domain --> master
+```
+
+| クレート | 中身（web との差分） |
+| --- | --- |
+| `master` | マスターデータの型と参照。起動時に一度読み込み（読むのは `infra` か `server`）、以後は読むだけ |
+| `domain` | 抽選・報酬・育成の規則。乱数と時刻は引数で受け取る（`impl RngCore` や現在時刻の値） |
+| `app`・`infra`・`api`・`server` | web と同じ |
+
+| 規則 | 強さ |
+| --- | --- |
+| `master` と `domain` は外部 I/O クレート（tokio・axum・sqlx・redis など）に依存しない（推移依存も含む）。`domain` が使える workspace のクレートは `master` だけ | MUST NOT |
+| `master` は `domain` に依存しない（`domain` が `master` を参照する一方向） | MUST NOT |
+| 抽選・報酬は乱数と時刻を引数で受け取る | MUST（レビューで確認。設定では強制できない） |
+| `api` は sqlx・redis を使わず、`infra` を使うのは `server` だけ | MUST |
+
+- 向く: マスターデータの規則が多いソシャゲ型 API、規則を単体テストで固めたいとき。
+- 向かない: 規則がほとんど無い API（rust/web の3層か2クレートを検討）。
+
+強制設定: [architecture/hexagonal/layers.conf](architecture/hexagonal/layers.conf)、[architecture/hexagonal/deny.toml](architecture/hexagonal/deny.toml)。
+check への組み込み: 2つを `architecture/` にコピーし、`sh scripts/check.sh deps` が `architecture: ok` を出すことを確かめます。
+
+### プレイヤー単位の読込・純粋変更・保存
+
+1リクエストを「プレイヤーの状態を読む → 純粋な関数で変える → 保存する」の1トランザクションで処理します。同時更新は楽観ロック（version 列）で弾きます。
+
+```mermaid
+flowchart LR
+    api --> usecase
+    api --> model
+    usecase --> store
+    usecase --> model
+    store --> model
+```
+
+| クレート | 中身 |
+| --- | --- |
+| `model` | プレイヤーの状態と、状態を変える純粋な関数（乱数・時刻は引数） |
+| `usecase` | 読込 → `model` の関数 → 保存を1トランザクションで行う。version の不一致は再試行かエラー |
+| `store` | sqlx での読込・保存（version 列で楽観ロック）、redis |
+| `api` | axum の handler・router と bin（`main.rs` は数行） |
+
+| 規則 | 強さ |
+| --- | --- |
+| `model` は workspace のどのクレートにも、外部 I/O クレートにも依存しない（推移依存も含む） | MUST NOT |
+| `api` は `store` を直接呼ばない | MUST NOT |
+| 1リクエスト＝1トランザクション、保存は version つきの UPDATE | MUST（レビューで確認） |
+| axum を直接使うのは `api`、sqlx・redis は `store` だけ | MUST |
+
+- 向く: スタミナ・所持品・進行度など、状態がプレイヤーごとに閉じた API。
+- 向かない: ギルド・ランキングなど、複数プレイヤーをまたぐ更新が多いもの（軽ヘキサゴナルで集約を分ける）。
+
+強制設定: [architecture/load-mutate-save/layers.conf](architecture/load-mutate-save/layers.conf)、[architecture/load-mutate-save/deny.toml](architecture/load-mutate-save/deny.toml)。
+check への組み込み: 2つを `architecture/` にコピーし、`sh scripts/check.sh deps` が `architecture: ok` を出すことを確かめます。
+
 ## 推奨スタック（調査時点 2026-10-30）
 
 | 役割 | 中核 | 補助 | 避けるもの |
@@ -239,6 +330,8 @@ macOS（aarch64）で、隔離した RUSTUP_HOME・CARGO_HOME と最小の fixtu
 - 異常系: `.await` をまたいで `std::sync::Mutex` の guard を持つ関数が `await_holding_lock` で落ち、await の前に guard を手放すと通ること。`sqlx::query`・`sqlx::query_as`・`reqwest::Client::new`・`reqwest::get` の呼び出しが `disallowed_methods` で落ちること（path 依存の偽 crate を使用）。`bincode`・`native-tls` の偽 crate が `deps` 段で ban されること。sqlx なし（`.sqlx/` なし）で `commit` が通ること、`check.sh` が `env: SQLX_OFFLINE=true` を表示し、呼び出し側の指定を尊重すること。
 - 設定してあるが、この leaf では実ツールで確かめていない規則: `await_holding_refcell_ref`。
 - 共通の段（unwrap・print・unsafe・missing docs・pedantic・`std::thread::sleep`・format・`[lints] workspace = true` 欠落・未使用依存・テスト0件・Cargo.lock なし・tool 不足・版違い・版の読み取り失敗・行カバレッジ90%未満・advisory DB の取得失敗とオフライン）の異常系は、`SQLX_OFFLINE` の4行を除いて同じ `scripts/check.sh` を持つ game の leaf（2026-11-01 に統合する前の game-realtime の leaf）で実ツールの確認をしています。この leaf では繰り返していません。
+
+依存の向き（[アーキテクチャ](#アーキテクチャ)）は、全選択肢について、許可された依存をすべて持つ fixture が `commit` に通ること、違反（禁止クレートへの直接依存、許可外の workspace クレートへの依存、推移依存の tokio、`uses` 行の無いクレート）が deps 段で落ちることを、path 依存の偽 crate で確かめています（2026-11-01、`tests/native/test_rust_architecture.py`）。外部依存を足す前は cargo-deny が `warning[unused-wrapper]` を出しますが、合格します。dev-dependencies は検査しません。
 
 fixture は配布しません。**Linux・Windows での実行、CI、本物のサーバー依存（tokio など）での build は未実施**です。
 

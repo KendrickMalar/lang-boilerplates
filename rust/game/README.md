@@ -24,6 +24,8 @@ lint は最大級に厳しくしています（pedantic・nursery・cargo を de
 | [.editorconfig](.editorconfig) | `.editorconfig` |
 | [.gitignore](.gitignore) | `.gitignore` |
 | [scripts/check.sh](scripts/check.sh) | `scripts/check.sh` |
+| [scripts/check-architecture.sh](scripts/check-architecture.sh) | `scripts/check-architecture.sh`（deps 段から呼ぶ） |
+| `architecture/<選択肢>/` の2ファイル | `architecture/`（基本設計で選んだ1つだけ。[アーキテクチャ](#アーキテクチャ)） |
 | [check-commit.mjs](check-commit.mjs) | `check-commit.mjs` |
 | [package.json](package.json) / [pnpm-workspace.yaml](pnpm-workspace.yaml) / [.node-version](.node-version) | 同名 |
 | [.husky/pre-commit](.husky/pre-commit) / [.husky/pre-push](.husky/pre-push) | 同名 |
@@ -95,7 +97,7 @@ tool 不足・版違い・source なし・Cargo.lock なし・テスト0件は�
 | --- | --- | --- |
 | format | `cargo fmt --all --check` | なし |
 | lint | 全 member の `[lints] workspace = true` の検査、`cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | なし |
-| deps | `cargo shear`、`cargo deny --offline check bans licenses sources` | なし |
+| deps | `cargo shear`、`cargo deny --offline check bans licenses sources`、`sh scripts/check-architecture.sh`（依存の向き。`architecture/layers.conf` が無ければ飛ばす） | なし |
 | test | `cargo nextest run --workspace --locked --no-tests=fail`、`cargo test --doc --workspace --locked`（library target が無いときは doctest を飛ばす）。単独実行用で、commit・push には含まない | なし |
 | coverage | `cargo llvm-cov nextest --workspace --locked --no-tests=fail --fail-under-lines "$line_floor"`（`line_floor=90`）のあと、test 段と同じ doctest | なし |
 | advisories | `cargo deny check advisories`（RustSec の advisory DB を取得） | **あり** |
@@ -221,6 +223,121 @@ crate を公開する（`publish` を外す）ときは、`description`・`licen
 - ban: `bincode`（RUSTSEC-2025-0141）、`fred`、`poem`、`openssl`、`openssl-sys`、`laminar`（2021 で停止）、`actix`（2024 で停止）。crates.io 以外の registry と git 依存は拒否します。
 - `[graph] targets` は書いていません。デプロイ先に合わせて、例えば `targets = ["x86_64-unknown-linux-gnu"]` を足します。
 
+## アーキテクチャ
+
+scaffold は仕様策定でこの節の選択肢を人に示し、基本設計で選ばれた選択肢の依存規則と強制設定（`architecture/<選択肢>/`）を導入します。
+どの選択肢もクレート分割で作ります。1クレート内のモジュール単位の向きは、stable の道具では強制できないためです（cargo-pup は nightly 専用）。
+選んだディレクトリの中身をプロジェクト root の `architecture/` へコピーすると有効になります（例: `architecture/sim-room/layers.conf` → `architecture/layers.conf`）。
+
+- `layers.conf`: `<crate> uses <crate>...` は直接依存してよい workspace のクレートの許可リスト、`<crate> never <crate>...` は通常依存と build 依存の木のどこにも現れてはいけないクレート（推移依存も含む）です。tokio のように多くのクレートの土台になるものは cargo-deny の `wrappers` では禁止できないので、こちらで禁止します。workspace の全クレートに `uses` 行が要ります。
+- `deny.toml`: cargo-deny の `[bans]` の `wrappers` で、axum・sqlx・ECS などを直接使ってよいクレートを決めます。ルートの [deny.toml](deny.toml) とは別の2回目の cargo-deny として実行するので、ルートの設定を書き換えません。
+- [scripts/check-architecture.sh](scripts/check-architecture.sh) が両方を検査し、[scripts/check.sh](scripts/check.sh) の deps 段から呼ばれます。`architecture/layers.conf` が無いときは `architecture: skipped (no architecture/layers.conf)` と出して飛ばします。dev-dependencies は検査しません。
+- 決定的なシミュレーションの lint（算術・cast・添字など）は workspace 全体にかかったままです。Cargo の `[lints] workspace = true` はクレートごとに上乗せできず（Cargo 1.99.1 で `` cannot override `workspace.lints` in `lints` `` になることを確認済み）、`sim` の `lib.rs` に寄せると設定で強制できなくなるためです。`room`・`gateway` でも `checked_*`・`try_from`・`get` で書きます。
+
+### 選び方
+
+- 対戦のルールを固定 tick で決定的に進め、再現やリプレイが要るか → はい: 純粋 sim＋ルーム actor
+- 1ルームに数百以上のエンティティがあり、種類の組み合わせが多いか → はい: ECS の核
+- ターン制などルールが小さく、ルーム管理も単純か → はい: 最小
+- 迷ったら純粋 sim＋ルーム actor（既定）にします。
+
+### 純粋 sim＋ルーム actor（既定）
+
+決定的な `sim` を、ルームごとの tokio task（actor）が所有して tick を進めます。外とは容量つき mpsc の handle で話します（Alice Ryhl の actor と handle の型）。
+
+```mermaid
+flowchart LR
+    server --> gateway
+    server --> room
+    server --> store
+    server --> sim
+    gateway --> room
+    gateway --> sim
+    room --> sim
+    store --> sim
+```
+
+| クレート | 中身 |
+| --- | --- |
+| `sim` | 状態と tick の更新。決定的・同期のみ。tokio・async・I/O・`HashMap` を使わない |
+| `room` | ルームごとの tokio task と handle（容量つき `mpsc::channel`）。時刻を読むのは tick の入口だけ |
+| `gateway` | axum の WebSocket、認証、protocol（メッセージの型と変換） |
+| `store` | 結果・状態の永続化（sqlx・redis） |
+| `server` | bin。組み立てだけ（`main.rs` は数行） |
+
+| 規則 | 強さ |
+| --- | --- |
+| `sim` は workspace のどのクレートにも、tokio・futures・axum・hyper・sqlx・redis・quinn などにも依存しない（推移依存も含む） | MUST NOT |
+| `room` は axum・sqlx・redis を使わない | MUST NOT |
+| axum を直接使うのは `gateway` と `server`、sqlx・redis は `store` だけ | MUST |
+| `sim` の中で async と `HashMap` を使わない | MUST NOT（`HashMap` は clippy.toml で全体に禁止済み。async はレビューで確認） |
+
+- 向く: リアルタイム対戦、リプレイ・不正検出のための再現、ルール単体のテスト。
+- 向かない: ルームを持たない常時接続の世界（MMO 型）。
+
+強制設定: [architecture/sim-room/layers.conf](architecture/sim-room/layers.conf)、[architecture/sim-room/deny.toml](architecture/sim-room/deny.toml)。
+check への組み込み: 2つを `architecture/` にコピーし、`sh scripts/check.sh deps` が `architecture: ok` を出すことを確かめます。
+
+### ECS の核
+
+純粋 sim＋ルーム actor と同じ形で、`sim` の中身を hecs か bevy_ecs で作ります。ECS は `sim` の外に出しません。
+
+```mermaid
+flowchart LR
+    server --> gateway
+    server --> room
+    server --> store
+    server --> sim
+    gateway --> room
+    gateway --> sim
+    room --> sim
+    store --> sim
+```
+
+| クレート | 中身（純粋 sim＋ルーム actor との差分） |
+| --- | --- |
+| `sim` | ECS の World・component・system。外へは自前の型（snapshot・command）で渡す |
+| `room`・`gateway`・`store`・`server` | 同じ。ECS の型を受け取らない |
+
+| 規則 | 強さ |
+| --- | --- |
+| hecs・bevy_ecs を直接使うのは `sim` だけ | MUST |
+| `sim` は tokio・axum・sqlx・redis・quinn などに依存しない（推移依存も含む） | MUST NOT |
+| `room` は axum・sqlx・redis を使わない | MUST NOT |
+
+- 向く: エンティティが多く、component の組み合わせで振る舞いを作るもの。
+- 向かない: エンティティが少ないもの（構造体のほうが読みやすく、決定性も確かめやすい）。
+
+`futures` は `never` に入れていません。bevy_ecs の推移依存に入るかを未確認のためです（純粋 sim＋ルーム actor と最小では禁止）。
+
+強制設定: [architecture/ecs/layers.conf](architecture/ecs/layers.conf)、[architecture/ecs/deny.toml](architecture/ecs/deny.toml)。
+check への組み込み: 2つを `architecture/` にコピーし、`sh scripts/check.sh deps` が `architecture: ok` を出すことを確かめます。
+
+### 最小
+
+純粋な状態機械の `rules` と、通信・ルーム・保存をまとめた `server` の2つです。
+
+```mermaid
+flowchart LR
+    server --> rules
+```
+
+| クレート | 中身 |
+| --- | --- |
+| `rules` | 純粋な状態機械（入力と状態から次の状態） |
+| `server` | WebSocket・ルーム・保存と bin |
+
+| 規則 | 強さ |
+| --- | --- |
+| `rules` は workspace のどのクレートにも、tokio・futures・axum・sqlx などにも依存しない（推移依存も含む） | MUST NOT |
+| axum・sqlx を直接使うのは `server` だけ | MUST |
+
+- 向く: ターン制、小さなパズル対戦、試作。
+- 向かない: ルーム管理や永続化が育つもの（`server` が膨らむ前に純粋 sim＋ルーム actor へ分ける）。
+
+強制設定: [architecture/minimal/layers.conf](architecture/minimal/layers.conf)、[architecture/minimal/deny.toml](architecture/minimal/deny.toml)。
+check への組み込み: 2つを `architecture/` にコピーし、`sh scripts/check.sh deps` が `architecture: ok` を出すことを確かめます。
+
 ## 推奨スタック（調査時点 2026-10-30）
 
 | 役割 | 中核 | 補助 | 避けるもの |
@@ -276,6 +393,8 @@ await の前に guard を手放すと通ること、`tokio::sync::mpsc::unbounde
 設定してあるが実ツールで確かめていない規則: `await_holding_refcell_ref`、`await_holding_invalid_type`、`large_futures`。
 上の結果は、統合前の game-realtime（決定的なシミュレーション）と game-room（非同期サーバー）の leaf で得たものです。
 2026-11-01 に両者を統合したこの leaf では、実ツールでの再実行はまだしていません（保守 suite `pnpm test:native:rust-game` は統合後の leaf を対象にしています）。
+依存の向き（[アーキテクチャ](#アーキテクチャ)）は、全選択肢について、許可された依存をすべて持つ fixture が `commit` に通ること、違反（禁止クレートへの直接依存、許可外の workspace クレートへの依存、推移依存の tokio、`uses` 行の無いクレート）が deps 段で落ちることを、path 依存の偽 crate で確かめています（2026-11-01、`tests/native/test_rust_architecture.py`）。外部依存を足す前は cargo-deny が `warning[unused-wrapper]` を出しますが、合格します。dev-dependencies は検査しません。
+
 fixture は配布しません。**Linux・Windows での実行、CI、本物のサーバー依存（tokio など）での build は未実施**です。
 
 本設定はこのリポジトリの MIT ライセンスです。依存のライセンスは製品の解決結果に対して別に確かめてください。

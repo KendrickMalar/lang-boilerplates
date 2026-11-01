@@ -22,6 +22,8 @@ lint は最大級に厳しくしています（pedantic・nursery・cargo を de
 | [.editorconfig](.editorconfig) | `.editorconfig` |
 | [.gitignore](.gitignore) | `.gitignore` |
 | [scripts/check.sh](scripts/check.sh) | `scripts/check.sh` |
+| [scripts/check-architecture.sh](scripts/check-architecture.sh) | `scripts/check-architecture.sh`（deps 段から呼ぶ） |
+| `architecture/<選択肢>/` の2ファイル | `architecture/`（基本設計で選んだ1つだけ。[アーキテクチャ](#アーキテクチャ)） |
 | [check-commit.mjs](check-commit.mjs) | `check-commit.mjs` |
 | [package.json](package.json) / [pnpm-workspace.yaml](pnpm-workspace.yaml) / [.node-version](.node-version) | 同名 |
 | [.husky/pre-commit](.husky/pre-commit) / [.husky/pre-push](.husky/pre-push) | 同名 |
@@ -93,7 +95,7 @@ tool 不足・版違い・source なし・Cargo.lock なし・テスト0件は�
 | --- | --- | --- |
 | format | `cargo fmt --all --check` | なし |
 | lint | 全 member の `[lints] workspace = true` の検査、`cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | なし |
-| deps | `cargo shear`、`cargo deny --offline check bans licenses sources` | なし |
+| deps | `cargo shear`、`cargo deny --offline check bans licenses sources`、`sh scripts/check-architecture.sh`（依存の向き。`architecture/layers.conf` が無ければ飛ばす） | なし |
 | test | `cargo nextest run --workspace --locked --no-tests=fail`、`cargo test --doc --workspace --locked`（library target が無いときは doctest を飛ばす）。単独実行用で、commit・push には含まない | なし |
 | coverage | `cargo llvm-cov nextest --workspace --locked --no-tests=fail --fail-under-lines "$line_floor"`（`line_floor=90`）のあと、test 段と同じ doctest | なし |
 | advisories | `cargo deny check advisories`（RustSec の advisory DB を取得） | **あり** |
@@ -190,6 +192,118 @@ crate を公開する（`publish` を外す）ときは、`description`・`licen
 - ban: `bincode`（RUSTSEC-2025-0141）、`fred`、`poem`、`openssl`、`openssl-sys`、`native-tls`（rustls に限定）。crates.io 以外の registry と git 依存は拒否します。
 - `[graph] targets` は書いていません。デプロイ先に合わせて、例えば `targets = ["x86_64-unknown-linux-gnu"]` を足します。
 
+## アーキテクチャ
+
+scaffold は仕様策定でこの節の選択肢を人に示し、基本設計で選ばれた選択肢の依存規則と強制設定（`architecture/<選択肢>/`）を導入します。
+どの選択肢もクレート分割で作ります。1クレート内のモジュール単位の向きは、stable の道具では強制できないためです（cargo-pup は nightly 専用）。
+
+強制設定は2つのファイルで、選んだ選択肢のディレクトリの中身をプロジェクト root の `architecture/` へコピーすると有効になります（例: `architecture/hexagonal/layers.conf` → `architecture/layers.conf`）。
+
+- `layers.conf`: `<crate> uses <crate>...` は、直接依存してよい workspace のクレートの許可リストです。`<crate> never <crate>...` は、通常依存と build 依存の木のどこにも現れてはいけないクレート（推移依存も含む）です。workspace の全クレートに `uses` 行が要ります。行の無いクレートを足すと失敗するので、新しいクレートの置き場所を必ず決めることになります。
+- `deny.toml`: cargo-deny の `[bans]` の `wrappers` で、外部クレート（axum・sqlx など）を直接使ってよいクレートを決めます。ルートの [deny.toml](deny.toml) とは別に2回目の cargo-deny として実行するので、ルートの設定を書き換えません。
+- [scripts/check-architecture.sh](scripts/check-architecture.sh) が両方を検査し、[scripts/check.sh](scripts/check.sh) の deps 段から呼ばれます（`cargo deny --offline --config architecture/deny.toml check bans` と `cargo tree --workspace -e normal,build --no-dedupe` の読み取り）。`architecture/layers.conf` が無いときは `architecture: skipped (no architecture/layers.conf)` と出して飛ばします。新しい tool は使いません。
+- dev-dependencies は検査しません（テストだけで使う依存は向きに数えない）。axum-extra のように axum を包むクレートを使うときは、`deny.toml` の axum の `wrappers` にそのクレートも足します。
+
+### 選び方
+
+- ドメインの規則が多く、DB や外部 API を差し替えてテストしたいか → はい: 軽ヘキサゴナル
+- 画面やエンドポイントごとの CRUD が中心で、規則は薄いか → はい: 3層
+- 小さな API や試作で、まずクレートを増やしたくないか → はい: 2クレート
+- 迷ったら軽ヘキサゴナル（既定）にします。3層・2クレートから後で移るより、最初に境界を作るほうが安く済みます。
+
+### 軽ヘキサゴナル（既定）
+
+業務の規則（`domain`）を中心に置き、DB・外部 API（`infra`）と HTTP（`api`）を外側に分けます。trait（port）は `app` に置き、`infra` が実装します。
+
+```mermaid
+flowchart LR
+    server --> api
+    server --> infra
+    server --> app
+    server --> domain
+    api --> app
+    api --> domain
+    infra --> app
+    infra --> domain
+    app --> domain
+```
+
+| クレート | 中身 |
+| --- | --- |
+| `domain` | 型と業務の規則。外部 I/O を持たない |
+| `app` | ユースケースと port（trait）。`domain` を組み合わせる |
+| `infra` | port の実装（sqlx・redis・reqwest） |
+| `api` | axum の handler・router・DTO |
+| `server` | bin。`infra` を作って `api` に渡す組み立てだけ（`main.rs` は数行） |
+
+| 規則 | 強さ |
+| --- | --- |
+| `domain` は workspace のどのクレートにも、外部 I/O クレート（tokio・axum・hyper・sqlx・reqwest・redis など）にも依存しない（推移依存も含む） | MUST NOT |
+| `api` は sqlx・redis を使わない（`app` 経由で呼ぶ） | MUST NOT |
+| `infra` を使うのは `server` だけ | MUST |
+| axum を直接使うのは `api` と `server`、sqlx・redis・reqwest は `infra` だけ | MUST |
+
+- 向く: 規則が多いサービス、DB を偽物に替えてユースケースを単体テストしたいとき、長く保守するもの。
+- 向かない: CRUD だけの小さな API（trait と組み立てが手間に見合わない）。
+
+強制設定: [architecture/hexagonal/layers.conf](architecture/hexagonal/layers.conf)、[architecture/hexagonal/deny.toml](architecture/hexagonal/deny.toml)。
+check への組み込み: 2つを `architecture/` にコピーし、`sh scripts/check.sh deps` が `architecture: ok` を出すことを確かめます。
+
+### 3層
+
+`api` → `service` → `store` の一方向です。trait は作らず、`service` が `store` の関数を直接呼びます。
+
+```mermaid
+flowchart LR
+    api --> service
+    service --> store
+```
+
+| クレート | 中身 |
+| --- | --- |
+| `api` | axum の handler・router と bin（`main.rs` は数行） |
+| `service` | 業務の処理。`store` を直接呼ぶ。起動時の接続も `service` の関数で包む |
+| `store` | SQL（sqlx）・redis・外部 API（reqwest） |
+
+| 規則 | 強さ |
+| --- | --- |
+| handler（`api`）は SQL を書かず、`store` を直接呼ばない | MUST NOT |
+| `store` は axum を使わない（`service` も推移依存で axum を持たない） | MUST NOT |
+| trait（port）は作らない | MUST NOT（レビューで確認。設定では強制できない） |
+| axum を直接使うのは `api`、sqlx・redis・reqwest は `store` だけ | MUST |
+
+- 向く: CRUD 中心の管理画面 API、規則の薄いサービス。
+- 向かない: DB を差し替えたテストが要るとき、規則が増えていくとき（軽ヘキサゴナルへ移る）。
+
+強制設定: [architecture/layered/layers.conf](architecture/layered/layers.conf)、[architecture/layered/deny.toml](architecture/layered/deny.toml)。
+check への組み込み: 2つを `architecture/` にコピーし、`sh scripts/check.sh deps` が `architecture: ok` を出すことを確かめます。
+
+### 2クレート
+
+業務の処理と保存をまとめた `core` と、HTTP と起動の `server` の2つです。
+
+```mermaid
+flowchart LR
+    server --> core
+```
+
+| クレート | 中身 |
+| --- | --- |
+| `core` | 業務の処理と保存（sqlx） |
+| `server` | axum の handler・router と bin |
+
+| 規則 | 強さ |
+| --- | --- |
+| HTTP の型（axum）を `core` に入れない（推移依存も含む） | MUST NOT |
+| `core` は `server` に依存しない | MUST NOT |
+| axum を直接使うのは `server`、sqlx は `core` だけ | MUST |
+
+- 向く: 小さな API、試作、1人で短期間に作るもの。
+- 向かない: 規則や保存先が増えるもの（`core` が膨らむ前に3層か軽ヘキサゴナルへ分ける）。
+
+強制設定: [architecture/two-crate/layers.conf](architecture/two-crate/layers.conf)、[architecture/two-crate/deny.toml](architecture/two-crate/deny.toml)。
+check への組み込み: 2つを `architecture/` にコピーし、`sh scripts/check.sh deps` が `architecture: ok` を出すことを確かめます。
+
 ## 推奨スタック（調査時点 2026-10-30）
 
 | 役割 | 中核 | 補助 | 避けるもの |
@@ -239,6 +353,8 @@ macOS（aarch64）で、隔離した RUSTUP_HOME・CARGO_HOME と最小の fixtu
 - 異常系: `.await` をまたいで `std::sync::Mutex` の guard を持つ関数が `await_holding_lock` で落ち、await の前に guard を手放すと通ること。`sqlx::query`・`sqlx::query_as`・`reqwest::Client::new`・`reqwest::get` の呼び出しが `disallowed_methods` で落ちること（path 依存の偽 crate を使用）。`bincode`・`native-tls` の偽 crate が `deps` 段で ban されること。sqlx なし（`.sqlx/` なし）で `commit` が通ること、`check.sh` が `env: SQLX_OFFLINE=true` を表示し、呼び出し側の指定を尊重すること。
 - 設定してあるが、この leaf では実ツールで確かめていない規則: `await_holding_refcell_ref`。
 - 共通の段（unwrap・print・unsafe・missing docs・pedantic・`std::thread::sleep`・format・`[lints] workspace = true` 欠落・未使用依存・テスト0件・Cargo.lock なし・tool 不足・版違い・版の読み取り失敗・行カバレッジ90%未満・advisory DB の取得失敗とオフライン）の異常系は、`SQLX_OFFLINE` の4行を除いて同じ `scripts/check.sh` を持つ game の leaf（2026-11-01 に統合する前の game-realtime の leaf）で実ツールの確認をしています。この leaf では繰り返していません。
+
+依存の向き（[アーキテクチャ](#アーキテクチャ)）は、全選択肢について、許可された依存をすべて持つ fixture が `commit` に通ること、違反（禁止クレートへの直接依存、許可外の workspace クレートへの依存、推移依存の tokio、`uses` 行の無いクレート）が deps 段で落ちることを、path 依存の偽 crate で確かめています（2026-11-01、`tests/native/test_rust_architecture.py`）。外部依存を足す前は cargo-deny が `warning[unused-wrapper]` を出しますが、合格します。dev-dependencies は検査しません。
 
 fixture は配布しません。**Linux・Windows での実行、CI、本物のサーバー依存（tokio など）での build は未実施**です。
 

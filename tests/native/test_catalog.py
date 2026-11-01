@@ -14,7 +14,12 @@ HUSKY_FILES = {'package.json', 'pnpm-workspace.yaml', '.node-version', 'check-co
 RUST_SERVER_FILES = {'README.md', 'LICENSE', '.editorconfig', '.gitignore', 'rust-toolchain.toml',
                      'rustfmt.toml', 'clippy.toml', 'deny.toml', 'Cargo.toml',
                      '.config/nextest.toml', '.cargo/config.toml', 'scripts/check.sh',
-                     '.husky/pre-commit', '.husky/pre-push'}
+                     'scripts/check-architecture.sh', '.husky/pre-commit', '.husky/pre-push'}
+
+
+def rust_architecture(*choices):
+    return {f'architecture/{choice}/{name}' for choice in choices
+            for name in ('layers.conf', 'deny.toml')}
 SWIFT_FILES = {'README.md', 'LICENSE', '.swift-format', '.swiftlint.yml',
                '.editorconfig', '.gitignore', 'Config/Quality.xcconfig',
                'Config/Debug.xcconfig', 'Config/Release.xcconfig',
@@ -55,8 +60,13 @@ class CatalogTests(unittest.TestCase):
     def test_independent_copy_exact_inventory_and_local_references(self):
         cache = ROOT / '.verification/native/catalog'
         cache.mkdir(parents=True, exist_ok=True)
-        for name, expected in [('rust/game', RUST_SERVER_FILES), ('rust/web-game', RUST_SERVER_FILES),
-                               ('rust/web', RUST_SERVER_FILES), ('swift/macos', SWIFT_FILES),
+        for name, expected in [('rust/game', RUST_SERVER_FILES
+                                | rust_architecture('sim-room', 'ecs', 'minimal')),
+                               ('rust/web-game', RUST_SERVER_FILES
+                                | rust_architecture('hexagonal', 'load-mutate-save')),
+                               ('rust/web', RUST_SERVER_FILES
+                                | rust_architecture('hexagonal', 'layered', 'two-crate')),
+                               ('swift/macos', SWIFT_FILES),
                                ('swift/ios', SWIFT_FILES), ('roblox/roblox-game', ROBLOX_FILES),
                                ('godot/mobile-game', GODOT_FILES), ('blender/assets', BLENDER_FILES)]:
             with self.subTest(leaf=name):
