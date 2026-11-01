@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-LEAF = ROOT / "roblox/rojo"
+LEAF = ROOT / "roblox/roblox-game"
 PINS = {"rojo": "rojo-rbx/rojo@7.7.1", "wally": "UpliftGames/wally@0.3.2",
         "selene": "Kampfkarren/selene@0.32.0", "stylua": "JohnnyMorganz/StyLua@2.5.2",
         "luau-lsp": "JohnnyMorganz/luau-lsp@1.69.0", "lune": "lune-org/lune@0.10.5"}

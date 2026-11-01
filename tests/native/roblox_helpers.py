@@ -10,7 +10,7 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-LEAF = ROOT / "roblox/rojo"
+LEAF = ROOT / "roblox/roblox-game"
 CACHE = ROOT / ".verification/native/roblox"
 SEED = CACHE / "seed"
 GREETING_SOURCE = """--!strict

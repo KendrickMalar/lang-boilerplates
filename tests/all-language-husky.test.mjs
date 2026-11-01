@@ -12,14 +12,13 @@ import { spawnSync } from "node:child_process";
 import { ROOT } from "./helpers.mjs";
 
 const leaves = [
-  "rust/tauri",
-  "rust/game-realtime",
-  "rust/game-room",
-  "rust/game-social",
+  "rust/game",
+  "rust/web-game",
+  "rust/web",
   "swift/macos",
   "swift/ios",
-  "roblox/rojo",
-  "godot/mobile",
+  "roblox/roblox-game",
+  "godot/mobile-game",
   "blender/assets",
 ];
 // Only the slow native compiler/test command is substituted. Git and Husky are real.
@@ -171,7 +170,7 @@ for (const fault of [
 }
 
 test("root Husky runs both nested language checks; the second failure blocks commit", () => {
-  const f = fixture("godot/mobile");
+  const f = fixture("godot/mobile-game");
   const pkgPath = join(f.root, "package.json");
   const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
   pkg.scripts.check =
@@ -193,7 +192,7 @@ test("root Husky runs both nested language checks; the second failure blocks com
 });
 
 test("Roblox Husky preserves exact push update stdin for its existing Luau guard", () => {
-  const f = fixture("roblox/rojo");
+  const f = fixture("roblox/roblox-game");
   const pkgPath = join(f.root, "package.json");
   const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
   pkg.scripts["check:git"] = "node guard.mjs";
@@ -268,8 +267,8 @@ test("global bridge preserves existing dispatcher and runs the current linked wo
 });
 
 test("foreign hook cannot silently run a different project's gate", () => {
-  const source = fixture("roblox/rojo");
-  const other = fixture("roblox/rojo");
+  const source = fixture("roblox/roblox-game");
+  const other = fixture("roblox/roblox-game");
   const result = other.run("sh", [join(source.root, ".husky/pre-commit")]);
   assert.notEqual(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout + result.stderr, /project root/);

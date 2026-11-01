@@ -60,7 +60,7 @@ class StaticBlenderTests(unittest.TestCase):
         for link in re.findall(r"\]\(([^)]+)\)", text):
             if "://" not in link and not link.startswith("#"):
                 self.assertTrue((LEAF / link).exists(), link)
-        for phrase in ["MAX_TRIANGLES", "build()", "--python-exit-code", "godot/mobile", "未検証"]:
+        for phrase in ["MAX_TRIANGLES", "build()", "--python-exit-code", "godot/mobile-game", "未検証"]:
             self.assertIn(phrase, text)
 
 

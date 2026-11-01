@@ -1,6 +1,6 @@
 # Roblox（Luau）設定
 
-- [Rojo プロジェクトの品質設定](rojo/README.md): Rokit で版固定した Rojo/StyLua/Selene/luau-lsp/
+- [Roblox ゲーム（Rojo）の品質設定](roblox-game/README.md): Rokit で版固定した Rojo/StyLua/Selene/luau-lsp/
   Lune/Wally。Rojo でファイル管理する Roblox ゲーム用です。
 
 各 leaf は自己完結し、製品 source・fixture・cache は配布しません。
@@ -15,11 +15,11 @@ macOS 実検証が対象で、Windows/Linux と Roblox Studio 実同期は未検
 `test:native:roblox` は実 tool と次の seed を必要とし、自動では用意しません。不在なら非0で止まります。
 導入・取得は対象と保存先を確認し、別途承認してから行ってください。
 
-1. Rokit で `roblox/rojo/rokit.toml` の6ツールを導入する（Apple Silicon は Wally 用に Rosetta 2）。
+1. Rokit で `roblox/roblox-game/rokit.toml` の6ツールを導入する（Apple Silicon は Wally 用に Rosetta 2）。
 2. `.verification/native/roblox/seed/` に `selene.toml`（`std = "roblox"`、`roblox-std-source = "pinned"`）を置き、
    そこで `selene generate-roblox-std` を実行して `roblox.yml` を作る。
 3. 同じ場所に luau-lsp 1.69.0 の `globalTypes.d.luau` を `globalTypes-1.69.0.d.luau` として保存し、
-   SHA256 が `roblox/rojo/scripts/check.sh` の値と一致することを確認する。
+   SHA256 が `roblox/roblox-game/scripts/check.sh` の値と一致することを確認する。
 
 4. 承認済みprivate ReleaseからCLI archiveを取得し、SHA256を照合してbinaryを別の検証領域へ展開します。
    元asset名のままのarchiveと、regular fileのbinaryを明示します。suiteは自動取得しません。

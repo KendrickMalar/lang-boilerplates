@@ -19,7 +19,7 @@ class HuskyGitStateTests(unittest.TestCase):
         parent = ROOT / '.verification/native/husky-git-state'
         parent.mkdir(parents=True, exist_ok=True)
         root = Path(tempfile.mkdtemp(prefix='snapshot-', dir=parent)) / 'project'
-        shutil.copytree(ROOT / 'roblox/rojo', root)
+        shutil.copytree(ROOT / 'roblox/roblox-game', root)
         # Snapshot only checks tracked inputs. These are not compiler/test fixtures.
         (root / 'roblox.yml').write_text('# snapshot-only fixture\n')
         (root / 'pnpm-lock.yaml').write_text('# snapshot-only fixture, never used to install\n')

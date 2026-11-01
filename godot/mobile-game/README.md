@@ -136,14 +136,14 @@ Simulator起動やapp配置・依存取得・ビルドなどの副作用も事�
 Husky は Git root に1つだけ配置します。各 leaf の言語設定・scripts は `game/` / `art/` などへ置き、
 上記の Node / Husky 管理ファイルは root に統合します。子ディレクトリで Husky を有効化しません。
 子の `node_modules/`・ビルド生成物も Git に入らないよう ignore を統合します。
-例えば godot/mobile と blender/assets の root package.json の `scripts.check` は次の値にします。
+例えば godot/mobile-game と blender/assets の root package.json の `scripts.check` は次の値にします。
 
 ```json
 "check": "sh game/scripts/check.sh all && sh art/scripts/check.sh all"
 ```
 
 各 check.sh は自身の leaf に移動します。どちらかが失敗すれば両フックとも非0になります。
-Tauri + TypeScript では root の `check` に backend と frontend の全体検査を漏れなく登録します。
+Rust サーバー + TypeScript frontend では root の `check` にサーバーと frontend の全体検査を漏れなく登録します。
 frontend側 package.json の check 名と root の集約 check 名を分け、相互呼び出しの再帰を避けます。
 Roblox の Git root / project root の不一致は既存 guard の対象外なので、guard を外して混在対応しません。
 

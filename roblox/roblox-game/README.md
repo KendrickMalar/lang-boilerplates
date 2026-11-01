@@ -1,4 +1,4 @@
-# Rojo プロジェクト — Roblox（Luau）品質設定
+# Roblox ゲーム（Rojo） — Roblox（Luau）品質設定
 
 Rojo でファイル管理する Roblox ゲーム用の自己完結した設定です。Rokit で次の版を固定します:
 Rojo **7.7.1**、StyLua **2.5.2**、Selene **0.32.0**、luau-lsp **1.69.0**、Lune **0.10.5**、
@@ -209,7 +209,7 @@ Husky は Git root に1つだけ配置します。各 leaf の言語設定・scr
 ```
 
 各 check.sh は自身の leaf に移動します。どちらかが失敗すれば両フックとも非0になります。
-Tauri + TypeScript では root の `check` に backend と frontend の全体検査を漏れなく登録します。
+Rust サーバー + TypeScript frontend では root の `check` にサーバーと frontend の全体検査を漏れなく登録します。
 frontend側 package.json の check 名と root の集約 check 名を分け、相互呼び出しの再帰を避けます。
 Roblox の Git root / project root の不一致は既存 guard の対象外なので、guard を外して混在対応しません。
 

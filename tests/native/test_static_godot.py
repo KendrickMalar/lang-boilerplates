@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-LEAF = ROOT / "godot/mobile"
+LEAF = ROOT / "godot/mobile-game"
 INSTALLERS = ["brew install", "pip install", "uv tool install", "pipx install", "npm install"]
 
 
