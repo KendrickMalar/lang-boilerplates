@@ -23,6 +23,7 @@ class HuskyGitStateTests(unittest.TestCase):
         # Snapshot only checks tracked inputs. These are not compiler/test fixtures.
         (root / 'roblox.yml').write_text('# snapshot-only fixture\n')
         (root / 'pnpm-lock.yaml').write_text('# snapshot-only fixture, never used to install\n')
+        shutil.copy2(root / 'architecture/modules.json', root / 'architecture.json')
         probe = root / '.verification/probe.luau'
         probe.parent.mkdir()
         probe.write_text('local Git = require("../scripts/git-state")\nGit.snapshot(false)\nprint("snapshot accepted")\n')
@@ -47,7 +48,8 @@ class HuskyGitStateTests(unittest.TestCase):
         self.assertEqual(accepted.returncode, 0, accepted.stdout + accepted.stderr)
         self.assertIn('snapshot accepted', accepted.stdout)
         for name in ['.husky/pre-commit', '.husky/pre-push', 'package.json',
-                     'pnpm-workspace.yaml', 'pnpm-lock.yaml', 'check-commit.mjs']:
+                     'pnpm-workspace.yaml', 'pnpm-lock.yaml', 'check-commit.mjs',
+                     'architecture.json']:
             with self.subTest(input=name):
                 # Remove only the fixture's index entry, retaining bytes and hiding the
                 # resulting untracked file to reach the REQUIRED-input check itself.

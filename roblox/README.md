@@ -10,6 +10,9 @@ macOS 実検証が対象で、Windows/Linux と Roblox Studio 実同期は未検
 保守 suite は repository root の `pnpm test:native:static` と `pnpm test:native:roblox` から
 明示実行します。未実行 native suite は既存 TypeScript suite の成功と分けて記録します。
 
+依存の向きの検査（`scripts/check-architecture.luau`）だけは `pnpm test:native:roblox-architecture` で
+単独に流せます。Rokit で導入済みの Rojo・Lune だけを使い、下記の seed・private CLI・network は使いません。
+
 ### 保守 suite の前提（Git 管理外 seed）
 
 `test:native:roblox` は実 tool と次の seed を必要とし、自動では用意しません。不在なら非0で止まります。
