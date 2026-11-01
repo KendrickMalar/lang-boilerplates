@@ -1,0 +1,10 @@
+{
+  "architecture": "features",
+  "source": "src",
+  "autoload_layer": "autoload",
+  "layers": [
+    {"name": "features", "path": "src/features/*", "may_depend_on": ["shared", "autoload"]},
+    {"name": "shared", "path": "src/shared", "may_depend_on": []},
+    {"name": "autoload", "path": "src/autoload", "may_depend_on": ["shared"]}
+  ]
+}
