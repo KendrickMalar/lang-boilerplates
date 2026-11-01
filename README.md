@@ -15,6 +15,25 @@ Scaffoldでプロジェクトを作る際に参照する、言語別の設定と
 
 Scaffoldは言語を選んだ後、当該言語のREADMEを読み、参照された設定ファイルと導入条件を確認します。各用途は親/兄弟設定に依存せず自己完結します。
 
+## 用途ごとのアーキテクチャ
+
+用途 README の「アーキテクチャ」節に、依存の向きの選択肢と、それを検査で強制する設定（各用途の `architecture/`）を置きます。scaffold は仕様策定で選択肢を提示し、基本設計で選ばれたものを導入します。
+
+| 用途                                                       | 選択肢                                                           | 既定                                  |
+| ---------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------- |
+| [TypeScript cli](./typescript/cli/README.md)               | オニオン／機能コア＋命令的シェル／機能別の縦割り                 | オニオン                              |
+| [TypeScript web](./typescript/web/README.md)               | オニオン（選択肢なし）                                           | オニオン                              |
+| [TypeScript web-game](./typescript/web-game/README.md)     | ルールの純粋コア／ECS／コア＋エンジンの殻                        | ルールの純粋コア                      |
+| [TypeScript ts-library](./typescript/ts-library/README.md) | 入口1つ＋internal／コア＋実行環境アダプター／機能別の複数入口    | 入口1つ＋internal                     |
+| [Rust web](./rust/web/README.md)                           | 軽ヘキサゴナル／3層／2クレート                                   | 軽ヘキサゴナル                        |
+| [Rust web-game](./rust/web-game/README.md)                 | 軽ヘキサゴナル／プレイヤー単位の読込・純粋変更・保存             | 軽ヘキサゴナル                        |
+| [Rust game](./rust/game/README.md)                         | 純粋 sim＋ルーム actor／ECS の核／最小                           | 純粋 sim＋ルーム actor                |
+| [Swift macos](./swift/macos/README.md)                     | 薄いアプリ＋ローカルパッケージ／1ターゲット＋フォルダ規則        | 薄いアプリ＋ローカルパッケージ        |
+| [Swift ios](./swift/ios/README.md)                         | 薄いアプリ＋ローカルパッケージ／1ターゲット＋フォルダ規則        | 薄いアプリ＋ローカルパッケージ        |
+| [Roblox roblox-game](./roblox/roblox-game/README.md)       | 素の ModuleScript＋共有の純粋ロジック／ECS（jecs または Matter） | 素の ModuleScript＋共有の純粋ロジック |
+| [Godot mobile-game](./godot/mobile-game/README.md)         | シーンの組み合わせ＋純粋な core／機能ごとのフォルダ              | シーンの組み合わせ＋純粋な core       |
+| [Blender assets](./blender/assets/README.md)               | フラット＋共通部品／純粋な形状計算＋bpy の変換役                 | フラット＋共通部品                    |
+
 ## 全言語共通の Git フック
 
 全言語・全用途で Husky **9.1.7** を必須にし、commit / push 前にテストを含む全体検査を実行します。

@@ -85,7 +85,7 @@ for (const preset of ["cli", "web", "ts-library"]) {
         root,
         ["check"],
         1,
-        /No test files found|No inputs were found|path does not exist: src|No product source directory/,
+        /No test files found|No inputs were found|path does not exist: src|No product source directory|Can't open 'src' for reading/,
       );
     },
   );

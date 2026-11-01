@@ -139,10 +139,10 @@ test("structural clones that pass jscpd cannot be committed", async () => {
       (_, index) => `  result = Math.max(result + ${index + 1}, ${index + 2});`,
     ).join("\n") +
     "\n  return result;\n}\n";
-  await write(root, "src/first.ts", first);
+  await write(root, "src/domain/first.ts", first);
   await write(
     root,
-    "src/second.ts",
+    "src/domain/second.ts",
     first
       .replaceAll("first", "second")
       .replaceAll("input", "value")
@@ -150,7 +150,7 @@ test("structural clones that pass jscpd cannot be committed", async () => {
   );
   const duplication = runAt(root, "pnpm", ["lint:duplicates"]);
   assert.equal(duplication.status, 0, duplication.output);
-  git(root, "add", "src/first.ts", "src/second.ts");
+  git(root, "add", "src/domain/first.ts", "src/domain/second.ts");
   const result = runAt(root, "git", [
     "commit",
     "-m",

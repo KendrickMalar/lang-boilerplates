@@ -83,7 +83,7 @@ test("Node application functions can keep inferred return types", async () => {
   const root = await copyPreset("cli");
   await write(
     root,
-    "src/public.ts",
+    "src/domain/public.ts",
     "export function increment(value: number) { return value + 1; }\n",
   );
   await expectResult(root, ["lint"], 0);
