@@ -164,6 +164,162 @@ commit前は`node check-commit.mjs`が**pnpm check全体**を実行します。�
 
 Huskyと直接Git hooksはどちらもローカル検査です。未導入端末・GitHub上の直接編集・hookスキップを防ぐ強制力はありません。失敗をスキップで回避しません。GitHub側CI・必須チェックはこの設定の対象外です。
 
+## アーキテクチャ
+
+scaffold は仕様策定でこの節の選択肢を人に提示し、基本設計で選ばれた選択肢の規則と強制設定（`architecture/`）を導入します。
+
+### 選び方
+
+- 入口が複数（CLI・常駐・HTTP など）あり、外部の都合（ファイル・DB・API）を差し替えたいか → **オニオン**（既定。迷ったらこれ）
+- 処理の大半が「入力を受けて結果を計算する」純粋な変換で、入出力は薄いか → **機能コア＋命令的シェル**
+- 互いに独立した機能が多く、機能ごとに担当や変更の頻度が分かれるか → **機能別の縦割り**
+- どれにも当たらない小さな道具でも、既定のオニオンを選びます。層を減らす独自構成は作りません。
+
+### オニオン（既定）
+
+業務のルール（domain）を中心に置き、外側ほど外部の都合に近い層にします。依存は外から内への一方向です。
+
+```mermaid
+flowchart LR
+  main["src/main.ts（組み立て）"] --> presentation
+  main --> infrastructure
+  presentation --> application
+  presentation --> domain
+  infrastructure --> application
+  infrastructure --> domain
+  application --> domain
+```
+
+| 層・ファイル          | 置くもの                                                              |
+| --------------------- | --------------------------------------------------------------------- |
+| `src/domain/`         | 型・値・業務ルール。純粋な関数だけ                                    |
+| `src/application/`    | ユースケース。外部への口（interface）を定義し、domain を呼ぶ          |
+| `src/infrastructure/` | 口の実装（ファイル・DB・HTTP クライアント・`node:*`・外部パッケージ） |
+| `src/presentation/`   | 入口（CLI の引数解析・常駐・HTTP サーバー）と出力の整形               |
+| `src/main.ts`         | 組み立て役。実装を選んで application と presentation につなぐ         |
+
+| 規則                                                                                                                           | 区分     |
+| ------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| domain は domain の中だけを import する                                                                                        | MUST     |
+| domain は外部パッケージ・`node:*`・Node だけのグローバル（`process`・`Buffer` など）・入出力のグローバル（`fetch` など）を使う | MUST NOT |
+| application は domain だけを import する（外部パッケージ・`node:*` も不可）                                                    | MUST     |
+| infrastructure は domain・application・外部パッケージ・`node:*` を import できる                                               | MUST     |
+| presentation は infrastructure を import する                                                                                  | MUST NOT |
+| `src/main.ts` 以外の、層の外の src ファイルを置く                                                                              | MUST NOT |
+
+- 向く: 入口や保存先が複数ある・増える。業務ルールをテストで固めたい。長く保守する。
+- 向かない: 一度きりの小さな変換スクリプト（層の分だけ手間が増える）。
+
+強制設定: [architecture/onion.mjs](./architecture/onion.mjs)（eslint-plugin-boundaries と `no-restricted-globals`）。
+
+1. `architecture/onion.mjs` を対象プロジェクトの同じパスへコピーします。既存ファイルがあれば停止して差分を確認します。
+2. `eslint.config.mjs` を次の内容にします。既存の設定があれば丸ごと置き換えず、`architecture` の import と末尾の追加だけを統合します。
+3. これで `pnpm lint`（`pnpm check` の Lint 段、commit 前・push 前のフック）が層の規則を検査します。`check` の変更は不要です。
+
+```js
+import { defineConfig } from "eslint/config";
+import { createConfig } from "./eslint.base.mjs";
+import architecture from "./architecture/onion.mjs";
+
+export default defineConfig(
+  createConfig({ environment: "node" }),
+  architecture,
+);
+```
+
+検査対象は src の JS/TS で、テスト（`tests/**`・`*.test.*`・`*.spec.*`・`__tests__`）は対象外です。`.js` 付きの import は eslint-import-resolver-typescript で `.ts` へ解決します。resolver を外すと層を判定できず、すべての import が違反になります（黙って見逃さない）。例外が要るときは規則を消さず、policy を足して理由をこの README に残します。
+
+### 機能コア＋命令的シェル
+
+計算はすべて純粋な core に置き、入出力・時刻・乱数などの副作用は薄い shell に集めます。
+
+```mermaid
+flowchart LR
+  main["src/main.ts（組み立て）"] --> shell
+  main --> core
+  shell --> core
+```
+
+| 層・ファイル  | 置くもの                                                              |
+| ------------- | --------------------------------------------------------------------- |
+| `src/core/`   | 型と純粋な関数。入力を受けて結果（と行うべき副作用の記述）を返す      |
+| `src/shell/`  | 引数・ファイル・ネットワーク・時刻を扱い、core を呼んで結果を実行する |
+| `src/main.ts` | 組み立て役。shell を起動する                                          |
+
+| 規則                                                                                                                    | 区分     |
+| ----------------------------------------------------------------------------------------------------------------------- | -------- |
+| core は core の中だけを import する                                                                                     | MUST     |
+| core は shell・外部パッケージ・`node:*`・`process` などの Node だけのグローバル・`fetch` などの入出力のグローバルを使う | MUST NOT |
+| shell は core・外部パッケージ・`node:*` を import できる                                                                | MUST     |
+| `src/main.ts` 以外の、core・shell の外の src ファイルを置く                                                             | MUST NOT |
+
+- 向く: 変換・集計・コード生成など、計算が主役で入出力が少ない CLI。core を速い単体テストで網羅したい。
+- 向かない: 外部サービスとのやり取りが中心で、差し替える口が多い（オニオンが合う）。
+
+強制設定: [architecture/functional-core.mjs](./architecture/functional-core.mjs)。導入手順はオニオンと同じで、コピーするファイルと `eslint.config.mjs` を次にします。core で純粋な外部パッケージを使いたいときは、package 名を限った policy を足し、理由を残します。
+
+```js
+import { defineConfig } from "eslint/config";
+import { createConfig } from "./eslint.base.mjs";
+import architecture from "./architecture/functional-core.mjs";
+
+export default defineConfig(
+  createConfig({ environment: "node" }),
+  architecture,
+);
+```
+
+### 機能別の縦割り
+
+機能ごとにフォルダを分け、その中をオニオンの層に分けます。機能の外へは `index.ts` だけを見せます。
+
+```mermaid
+flowchart LR
+  main["src/main.ts（組み立て）"] --> entryA["features/a/index.ts"]
+  entryA --> infraA["features/a/infrastructure"]
+  entryA --> appA["features/a/application"]
+  infraA --> appA
+  infraA --> domainA["features/a/domain"]
+  appA --> domainA
+  appA --> entryB["features/b/index.ts"]
+  domainA --> shared["src/shared"]
+  appA --> shared
+```
+
+| 層・ファイル                          | 置くもの                                           |
+| ------------------------------------- | -------------------------------------------------- |
+| `src/features/<名前>/domain/`         | その機能の型・業務ルール（純粋）                   |
+| `src/features/<名前>/application/`    | その機能のユースケース                             |
+| `src/features/<名前>/infrastructure/` | その機能の入出力（`node:*`・外部パッケージ）       |
+| `src/features/<名前>/index.ts`        | その機能の公開窓口。外へ見せるものだけを再公開する |
+| `src/shared/`                         | 複数の機能が使う純粋な型・関数（入出力を持たない） |
+| `src/main.ts`                         | 組み立て役。各機能の `index.ts` を呼ぶ             |
+
+| 規則                                                                                                   | 区分     |
+| ------------------------------------------------------------------------------------------------------ | -------- |
+| 機能の中の層の向きはオニオンと同じ（domain ← application ← infrastructure）                            | MUST     |
+| 他の機能へは、その機能の `index.ts` を経由する                                                         | MUST     |
+| 他の機能の domain・application・infrastructure を直接 import する                                      | MUST NOT |
+| domain と shared は外部パッケージ・`node:*`・Node だけのグローバル・入出力のグローバル・他の機能を使う | MUST NOT |
+| shared は機能を import する                                                                            | MUST NOT |
+| `src/main.ts` は機能の `index.ts`・shared 以外の src を import する                                    | MUST NOT |
+
+- 向く: 独立した機能（サブコマンド・業務単位）が多く、機能を足し引きしやすくしたい。
+- 向かない: 機能が1〜2個しかない、または機能同士が密に絡む（境界の分だけ手間が増える）。
+
+強制設定: [architecture/vertical-slices.mjs](./architecture/vertical-slices.mjs)。導入手順はオニオンと同じで、コピーするファイルと `eslint.config.mjs` を次にします。入出力を持つ共通処理は shared ではなく1つの機能（例: `features/platform`）にして `index.ts` から公開します。
+
+```js
+import { defineConfig } from "eslint/config";
+import { createConfig } from "./eslint.base.mjs";
+import architecture from "./architecture/vertical-slices.mjs";
+
+export default defineConfig(
+  createConfig({ environment: "node" }),
+  architecture,
+);
+```
+
 ## 公式資料
 
 - https://www.typescriptlang.org/tsconfig/
