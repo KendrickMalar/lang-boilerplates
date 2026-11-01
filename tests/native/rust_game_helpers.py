@@ -11,6 +11,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = ROOT / ".verification/native/rust-game"
 LEAVES = ("game", "web-game", "web")
+# The deps stage fails without a selected architecture; fixtures select the default one.
+DEFAULT_CHOICE = {"game": "sim-room", "web-game": "hexagonal", "web": "hexagonal"}
 
 
 def game_env(cwd: Path, *, online: bool = False) -> dict[str, str]:
@@ -31,13 +33,27 @@ def game_env(cwd: Path, *, online: bool = False) -> dict[str, str]:
     return env
 
 
-def copy_leaf(leaf: str, prefix: str) -> Path:
+def copy_leaf(leaf: str, prefix: str, *, choose: bool = True) -> Path:
+    """Copy one leaf; `choose` selects its default architecture (architecture/<choice>/* ->
+    architecture/), as a consumer does before the basic design picks one."""
     if leaf not in LEAVES:
         raise ValueError(f"unknown leaf: {leaf}")
     (CACHE / "fixtures").mkdir(parents=True, exist_ok=True)
     fixture = Path(tempfile.mkdtemp(prefix=f"{prefix}-", dir=CACHE / "fixtures")) / "project"
     shutil.copytree(ROOT / "rust" / leaf, fixture)
+    if choose:
+        for file in (fixture / "architecture" / DEFAULT_CHOICE[leaf]).iterdir():
+            shutil.copy(file, fixture / "architecture" / file.name)
     return fixture
+
+
+def register_crate(root: Path, name: str, deps: str) -> None:
+    """Give a fixture crate its `uses` line (its workspace path deps) in the selected layers.conf."""
+    conf = root / "architecture/layers.conf"
+    if conf.is_file():
+        internal = re.findall(r'path = "\.\./([\w-]+)"', deps)
+        with conf.open("a") as layers:
+            layers.write(" ".join([name, "uses", *internal]) + "\n")
 
 
 def write_fake_crate(root: Path, name: str, lib: str) -> str:

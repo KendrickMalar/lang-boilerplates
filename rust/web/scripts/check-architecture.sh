@@ -6,7 +6,7 @@
 #     appear anywhere in its normal/build dependency tree). Every workspace member needs a
 #     `uses` line, even an empty one.
 #   architecture/deny.toml: cargo-deny `[bans]` wrappers (which crates may use a crate directly).
-# Dev-dependencies are not checked. Never installs tools or edits files.
+# Without architecture/layers.conf it fails with exit 2. Dev-dependencies are not checked. Never installs tools or edits files.
 set -eu
 fail() { printf '%s\n' "error: $*" >&2; exit 1; }
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -14,8 +14,14 @@ cd "$root"
 conf=architecture/layers.conf
 bans=architecture/deny.toml
 if [ ! -f "$conf" ]; then
-    printf '%s\n' "architecture: skipped (no $conf)"
-    exit 0
+    # Fail closed: a missing selection must not silently disable the check.
+    printf '%s\n' "error: missing $conf: no architecture is selected." >&2
+    printf '%s\n' "  Copy the chosen choice's two files to architecture/ (README: アーキテクチャ)," >&2
+    printf '%s\n' "  e.g. cp <leaf>/architecture/<choice>/layers.conf <leaf>/architecture/<choice>/deny.toml architecture/" >&2
+    for dir in architecture/*/; do
+        [ -f "${dir}layers.conf" ] && printf '%s\n' "  available here: ${dir%/}" >&2
+    done
+    exit 2
 fi
 [ -f "$bans" ] || fail "missing $bans (copy it together with $conf)"
 cargo=${CARGO:-cargo}

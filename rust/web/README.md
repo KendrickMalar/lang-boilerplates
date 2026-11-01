@@ -23,7 +23,7 @@ lint は最大級に厳しくしています（pedantic・nursery・cargo を de
 | [.gitignore](.gitignore) | `.gitignore` |
 | [scripts/check.sh](scripts/check.sh) | `scripts/check.sh` |
 | [scripts/check-architecture.sh](scripts/check-architecture.sh) | `scripts/check-architecture.sh`（deps 段から呼ぶ） |
-| `architecture/<選択肢>/` の2ファイル | `architecture/`（基本設計で選んだ1つだけ。[アーキテクチャ](#アーキテクチャ)） |
+| `architecture/<選択肢>/` の2ファイル | `architecture/`（基本設計で選んだ1つだけ。選ぶまでは既定の選択肢。無いと deps 段が失敗。[アーキテクチャ](#アーキテクチャ)） |
 | [check-commit.mjs](check-commit.mjs) | `check-commit.mjs` |
 | [package.json](package.json) / [pnpm-workspace.yaml](pnpm-workspace.yaml) / [.node-version](.node-version) | 同名 |
 | [.husky/pre-commit](.husky/pre-commit) / [.husky/pre-push](.husky/pre-push) | 同名 |
@@ -95,7 +95,7 @@ tool 不足・版違い・source なし・Cargo.lock なし・テスト0件は�
 | --- | --- | --- |
 | format | `cargo fmt --all --check` | なし |
 | lint | 全 member の `[lints] workspace = true` の検査、`cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | なし |
-| deps | `cargo shear`、`cargo deny --offline check bans licenses sources`、`sh scripts/check-architecture.sh`（依存の向き。`architecture/layers.conf` が無ければ飛ばす） | なし |
+| deps | `cargo shear`、`cargo deny --offline check bans licenses sources`、`sh scripts/check-architecture.sh`（依存の向き。`architecture/layers.conf` が無ければ終了コード2） | なし |
 | test | `cargo nextest run --workspace --locked --no-tests=fail`、`cargo test --doc --workspace --locked`（library target が無いときは doctest を飛ばす）。単独実行用で、commit・push には含まない | なし |
 | coverage | `cargo llvm-cov nextest --workspace --locked --no-tests=fail --fail-under-lines "$line_floor"`（`line_floor=90`）のあと、test 段と同じ doctest | なし |
 | advisories | `cargo deny check advisories`（RustSec の advisory DB を取得） | **あり** |
@@ -201,7 +201,7 @@ scaffold は仕様策定でこの節の選択肢を人に示し、基本設計�
 
 - `layers.conf`: `<crate> uses <crate>...` は、直接依存してよい workspace のクレートの許可リストです。`<crate> never <crate>...` は、通常依存と build 依存の木のどこにも現れてはいけないクレート（推移依存も含む）です。workspace の全クレートに `uses` 行が要ります。行の無いクレートを足すと失敗するので、新しいクレートの置き場所を必ず決めることになります。
 - `deny.toml`: cargo-deny の `[bans]` の `wrappers` で、外部クレート（axum・sqlx など）を直接使ってよいクレートを決めます。ルートの [deny.toml](deny.toml) とは別に2回目の cargo-deny として実行するので、ルートの設定を書き換えません。
-- [scripts/check-architecture.sh](scripts/check-architecture.sh) が両方を検査し、[scripts/check.sh](scripts/check.sh) の deps 段から呼ばれます（`cargo deny --offline --config architecture/deny.toml check bans` と `cargo tree --workspace -e normal,build --no-dedupe` の読み取り）。`architecture/layers.conf` が無いときは `architecture: skipped (no architecture/layers.conf)` と出して飛ばします。新しい tool は使いません。
+- [scripts/check-architecture.sh](scripts/check-architecture.sh) が両方を検査し、[scripts/check.sh](scripts/check.sh) の deps 段から呼ばれます（`cargo deny --offline --config architecture/deny.toml check bans` と `cargo tree --workspace -e normal,build --no-dedupe` の読み取り）。`architecture/layers.conf` が無いときは飛ばさず、`error: missing architecture/layers.conf` とコピーの手順を出して終了コード2で止まります（黙って検査が効かない状態にしない）。基本設計で選ぶ前から check を通すには、既定の選択肢をコピーしておきます。新しい tool は使いません。
 - dev-dependencies は検査しません（テストだけで使う依存は向きに数えない）。axum-extra のように axum を包むクレートを使うときは、`deny.toml` の axum の `wrappers` にそのクレートも足します。
 
 ### 選び方

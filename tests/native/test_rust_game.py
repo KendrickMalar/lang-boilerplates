@@ -4,8 +4,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
-from tests.native.rust_game_helpers import (CACHE, LEAVES, copy_leaf, game_env, run_game,
-                                            write_fake_crate)
+from tests.native.rust_game_helpers import (CACHE, LEAVES, copy_leaf, game_env, register_crate,
+                                            run_game, write_fake_crate)
 
 CLEAN = '''//! Core game rules.
 
@@ -44,6 +44,7 @@ def write_crate(root: Path, name: str, lib: str, *, workspace_lints: bool = True
         'edition.workspace = true\nrust-version.workspace = true\npublish.workspace = true\n'
         f'\n[dependencies]\n{deps}\n{lints}')
     (crate / "src/lib.rs").write_text(lib)
+    register_crate(root, name, deps)
 
 
 def with_items(items: str) -> str:

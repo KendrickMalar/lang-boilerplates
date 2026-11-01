@@ -56,7 +56,7 @@ class ArchitectureFixture(unittest.TestCase):
               externals: bool = True, drop: dict[str, set[str]] | None = None) -> Path:
         """add: extra dependencies per member (a new key adds a member); vendor: stand-ins;
         drop: allowed edges to remove, so that an upward edge does not make a Cargo cycle."""
-        root = copy_leaf(leaf, f"arch-{choice}")
+        root = copy_leaf(leaf, f"arch-{choice}", choose=False)
         chosen = root / "architecture" / choice
         uses, _ = layers(chosen / "layers.conf")
         wrappers = {entry["crate"]: entry["wrappers"]
@@ -118,10 +118,17 @@ class ArchitectureKeepTests(ArchitectureFixture):
         self.assertIn("warning[unused-wrapper]", result.stderr)
         self.assertIn("architecture: ok", result.stdout)
 
-    def test_without_selection_is_skipped(self):
-        result = self.deps(self.build("web", "hexagonal", select=False))
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("architecture: skipped (no architecture/layers.conf)", result.stdout)
+    def test_without_selection_fails_closed(self):
+        for leaf, choices in CHOICES.items():
+            with self.subTest(leaf=leaf):
+                result = self.deps(self.build(leaf, choices[0], select=False))
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("error: missing architecture/layers.conf: no architecture is selected.",
+                              result.stderr)
+                self.assertIn("Copy the chosen choice's two files to architecture/", result.stderr)
+                for choice in choices:
+                    self.assertIn(f"available here: architecture/{choice}", result.stderr)
+                self.assertNotIn("architecture: ok", result.stdout)
 
 
 class ArchitectureScriptTests(ArchitectureFixture):
