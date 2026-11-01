@@ -168,6 +168,71 @@ commit前は`node check-commit.mjs`が**pnpm check全体**を実行します。�
 
 Huskyと直接Git hooksはどちらもローカル検査です。未導入端末・GitHub上の直接編集・hookスキップを防ぐ強制力はありません。失敗をスキップで回避しません。GitHub側CI・必須チェックはこの設定の対象外です。
 
+## アーキテクチャ
+
+scaffold は仕様策定でこの節の選択肢を人に提示し、基本設計で選ばれた選択肢の規則と強制設定（`architecture/`）を導入します。
+
+### 選び方
+
+- 汎用 Web は選択肢を設けず、常に **オニオン** を使います。仕様策定では「この型で進める」ことだけを確認します。
+- 画面の部品（React などのコンポーネント・DOM 操作）はどこに置くか → presentation
+- `fetch`・`localStorage`・外部 API のクライアントはどこに置くか → infrastructure
+- 画面にも通信にも依らない計算・検証はどこに置くか → domain（手順の組み立ては application）
+
+### オニオン（既定）
+
+業務のルール（domain）を中心に置き、外側ほどブラウザや外部サービスの都合に近い層にします。依存は外から内への一方向です。
+
+```mermaid
+flowchart LR
+  main["src/main.ts（組み立て）"] --> presentation
+  main --> infrastructure
+  presentation --> application
+  presentation --> domain
+  infrastructure --> application
+  infrastructure --> domain
+  application --> domain
+```
+
+| 層・ファイル          | 置くもの                                                                |
+| --------------------- | ----------------------------------------------------------------------- |
+| `src/domain/`         | 型・値・業務ルール。純粋な関数だけ                                      |
+| `src/application/`    | ユースケース。外部への口（interface）を定義し、domain を呼ぶ            |
+| `src/infrastructure/` | 口の実装（`fetch`・ストレージ・外部パッケージのクライアント）           |
+| `src/presentation/`   | 画面（コンポーネント・DOM 操作・イベント）。画像・CSS などの素材もここ  |
+| `src/main.ts`         | 組み立て役。`index.html` の `<script type="module" src="/src/main.ts">` |
+
+| 規則                                                                                                                                        | 区分     |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| domain は domain の中だけを import する                                                                                                     | MUST     |
+| domain は外部パッケージ・`node:*`・ブラウザだけのグローバル・入出力のグローバル（`document`・`window`・`fetch`・`localStorage` など）を使う | MUST NOT |
+| application は domain だけを import する（外部パッケージも不可）                                                                            | MUST     |
+| infrastructure・presentation は domain・application・外部パッケージを import できる                                                         | MUST     |
+| presentation は infrastructure を import する（つなぐのは `src/main.ts`）                                                                   | MUST NOT |
+| `src/main.ts` 以外の、層の外の src ファイルを置く・import する                                                                              | MUST NOT |
+
+- 向く: フォーム・一覧・ダッシュボードなど、画面と通信と業務ルールが分かれる Web アプリ全般。
+- 向かない: 1画面だけの使い捨て試作（それでもこの用途では層を省きません）。
+
+強制設定: [architecture/onion.mjs](./architecture/onion.mjs)（eslint-plugin-boundaries と `no-restricted-globals`）。
+
+1. `architecture/onion.mjs` を対象プロジェクトの同じパスへコピーします。既存ファイルがあれば停止して差分を確認します。
+2. `eslint.config.mjs` を次の内容にします。既存の設定があれば丸ごと置き換えず、`architecture` の import と末尾の追加だけを統合します。
+3. これで `pnpm lint`（`pnpm check` の Lint 段、commit 前・push 前のフック）が層の規則を検査します。`check` の変更は不要です。
+
+```js
+import { defineConfig } from "eslint/config";
+import { createConfig } from "./eslint.base.mjs";
+import architecture from "./architecture/onion.mjs";
+
+export default defineConfig(
+  createConfig({ environment: "browser" }),
+  architecture,
+);
+```
+
+検査対象は src の JS/TS で、テスト（`tests/**`・`*.test.*`・`*.spec.*`・`__tests__`）は対象外です。import は eslint-import-resolver-typescript が `tsconfig.app.json` の解決どおりに辿ります（拡張子なし・`.js` 付きの両方）。resolver を外すと層を判定できず、すべての import が違反になります（黙って見逃さない）。src 直下の素材（`src/style.css` など）を import すると層の外として拒否されるので、素材は presentation に置きます。例外が要るときは規則を消さず、policy を足して理由をこの README に残します。
+
 ## 公式資料
 
 - https://www.typescriptlang.org/tsconfig/
