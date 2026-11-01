@@ -81,8 +81,8 @@ cargo +1.99.1 metadata --locked --format-version 1
 ## チェック
 
 ```sh
-sh scripts/check.sh commit   # format → lint → deps → test
-sh scripts/check.sh push     # commit の4段 → coverage → advisories → build（all も同じ）
+sh scripts/check.sh commit   # format → lint → deps → coverage
+sh scripts/check.sh push     # commit の4段 → advisories → build（all も同じ）
 sh scripts/check.sh lint     # format|lint|deps|test|coverage|advisories|build を1段だけ
 ```
 
@@ -94,12 +94,12 @@ tool 不足・版違い・source なし・Cargo.lock なし・テスト0件は�
 | format | `cargo fmt --all --check` | なし |
 | lint | 全 member の `[lints] workspace = true` の検査、`cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | なし |
 | deps | `cargo shear`、`cargo deny --offline check bans licenses sources` | なし |
-| test | `cargo nextest run --workspace --locked --no-tests=fail`、`cargo test --doc --workspace --locked`（library target が無いときは doctest を飛ばす） | なし |
-| coverage | `cargo llvm-cov nextest --workspace --locked --no-tests=fail --fail-under-lines "$line_floor"`（`line_floor=90`） | なし |
+| test | `cargo nextest run --workspace --locked --no-tests=fail`、`cargo test --doc --workspace --locked`（library target が無いときは doctest を飛ばす）。単独実行用で、commit・push には含まない | なし |
+| coverage | `cargo llvm-cov nextest --workspace --locked --no-tests=fail --fail-under-lines "$line_floor"`（`line_floor=90`）のあと、test 段と同じ doctest | なし |
 | advisories | `cargo deny check advisories`（RustSec の advisory DB を取得） | **あり** |
 | build | `cargo build --workspace --locked --release` | なし |
 
-行カバレッジの下限は **90%** です（doctest は数えません）。変えるときは `scripts/check.sh` の
+行カバレッジの下限は **90%** です（doctest は数えません）。commit のたびに検査します（2026-11-01 改訂。以前は push 時だけ）。テストは coverage 段で1回だけ実行します。変えるときは `scripts/check.sh` の
 `line_floor=90` の数値を変え、理由を製品 README に残してください（`--fail-under-lines` とエラー文はこの値を使います）。
 下限を割ると `error: line coverage below 90% (--fail-under-lines 90)` を出して非0で止まります。
 テストの失敗は、この文言を出さずに nextest の結果のまま止まります。
