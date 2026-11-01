@@ -72,6 +72,28 @@ test("each leaf includes its own complete safe TypeScript configuration", () => 
     }
   }
 });
+test("each leaf enforces 90% Vitest coverage over all of src", () => {
+  for (const name of ["node", "web", "library", "web-game-3d"]) {
+    const dir = join(ROOT, "typescript", name);
+    const manifest = JSON.parse(
+      readFileSync(join(dir, "package.json"), "utf8"),
+    );
+    assert.equal(manifest.devDependencies["@vitest/coverage-v8"], "5.0.3");
+    assert.equal(manifest.devDependencies.vitest, "5.0.3");
+    assert.equal(manifest.scripts.test, "vitest run");
+    const config = readFileSync(join(dir, "vitest.config.ts"), "utf8");
+    for (const text of [
+      "enabled: true",
+      'provider: "v8"',
+      'include: ["src/**/*.{ts,mts,cts,tsx}"]',
+      "thresholds: { lines: 90, branches: 90, functions: 90, statements: 90 }",
+    ])
+      assert.ok(config.includes(text), name + " vitest.config.ts: " + text);
+    const readme = readFileSync(join(dir, "README.md"), "utf8");
+    for (const text of ["カバレッジ", "90%", "v8 ignore"])
+      assert.ok(readme.includes(text), name + " README: " + text);
+  }
+});
 test("TypeScript root contains only the language entry and standalone directories", () => {
   assert.deepEqual(readdirSync(join(ROOT, "typescript")).sort(), [
     "README.md",

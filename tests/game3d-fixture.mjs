@@ -21,6 +21,8 @@ export async function createGame3dFixture() {
     `import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 
+// Browser entry: verified by Playwright E2E, not by Vitest coverage.
+/* v8 ignore start */
 function report(name: string, value: string): void {
   const output = document.querySelector('[data-testid="' + name + '"]');
   if (!output) throw new Error("Missing output " + name);
@@ -99,6 +101,7 @@ void start().catch((error: unknown) => {
   report("ready", "error");
   throw error;
 });
+/* v8 ignore stop */
 `,
   );
   await write(
