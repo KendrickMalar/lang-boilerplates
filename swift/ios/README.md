@@ -45,8 +45,10 @@ export NATIVE_APP_DESTINATION='platform=iOS Simulator,id=YOUR-APPROVED-DEVICE-UU
 sh scripts/check.sh all
 ```
 
-Modes: `format|lint|settings|test|build|all`. `all` stops at the first failure in
-format(strict) → SwiftLint(strict) → settings → app test → native build.
+Modes: `format|lint|architecture|settings|test|build|all`. `all` stops at the first failure in
+format(strict) → SwiftLint(strict) → architecture → settings → app test → native build.
+`all` and `architecture` require `NATIVE_APP_ARCHITECTURE` (see アーキテクチャ below);
+unset or unknown values fail before any stage runs, so the rules are never silently skipped.
 Project/source paths must resolve inside the copied project root. Missing/empty
 source, missing project/scheme/destination/tool and zero/only-skipped tests fail.
 No `ignore-exit`, lenient syntax or validation bypass is used. Formatter never
@@ -106,6 +108,102 @@ This does not promise a hard 100-column maximum. Other default lint checks remai
 The [formatter configuration documentation](https://github.com/swiftlang/swift-format/blob/main/Documentation/Configuration.md)
 explains these options; verify against the selected Xcode formatter rather than
 assuming a newer documentation option is supported.
+
+## アーキテクチャ
+
+scaffold が仕様策定でこの節の選択肢を人に提示し、基本設計で選ばれた選択肢の規則と強制設定（下記の同梱ファイル）を導入します。
+
+### 選び方
+
+- 画面（機能）が3つ以上になる、または人やエージェントが並行して作るか → はい: 薄いアプリ＋ローカルパッケージ
+- 計算・状態遷移・データ変換を、UI なしの速いテストで確かめたいか → はい: 薄いアプリ＋ローカルパッケージ
+- 画面1〜2枚の小さな道具や試作で、パッケージを分ける手間が見合わないか → はい: 1ターゲット＋フォルダ規則
+- 迷ったら既定の薄いアプリ＋ローカルパッケージにします。後から移すときは Models → Core、Services → Clients、Views → Features の順に切り出せます。
+
+### 薄いアプリ＋ローカルパッケージ（既定）
+
+Xcode のアプリターゲットは `@main` と組み立てだけを持ち、中身はローカル Swift パッケージのターゲットに分けます。依存の向きは SwiftPM のターゲット依存、宣言の検査、毎回のクリーンビルド、SwiftLint で強制します。
+
+```mermaid
+flowchart TD
+    App["App（xcodeproj・@main・組み立て）"] --> Features["Features/*（画面・SwiftUI）"]
+    App --> Clients["Clients（I/O の実装）"]
+    Features --> Core["Core（純粋な Swift）"]
+    Clients --> Core
+```
+
+```text
+YourApp.xcodeproj             App ターゲット（@main。Clients を Features に渡す）
+Sources/App/                  App のソース（NATIVE_APP_SOURCE_DIR）
+Modules/                      ローカルパッケージ（NATIVE_APP_PACKAGE_DIR）
+├── Package.swift
+├── Sources/Core/             モデル・ルール・Client の protocol
+├── Sources/Clients/          ネットワーク・保存などの実装
+├── Sources/Features/Home/    HomeFeature（画面ごとに1ターゲット）
+└── Tests/CoreTests/
+```
+
+| 規則 | MUST／MUST NOT |
+| --- | --- |
+| Core は SwiftUI・UIKit・SwiftData を import しない | MUST NOT |
+| Core は Clients・Feature を import せず、どのターゲットや外部パッケージにも依存しない | MUST NOT |
+| Feature（`<名前>Feature`）は Core にだけ依存し、他の Feature や Clients を import しない | MUST |
+| Clients は Core にだけ依存し、Feature を import しない | MUST |
+| パッケージのターゲットは Core・Clients・`<名前>Feature`・テストだけにする | MUST |
+| App だけが Features と Clients を import し、Core の protocol を通して Clients を Features に渡す | MUST |
+| 外部パッケージを使うときは、ローカルパッケージの `Package.resolved` を Git に置く | MUST |
+
+- 向く: 画面が増えるアプリ、並行開発、ロジックを UI なしでテストしたい場合。
+- 向かない: 画面1〜2枚の試作、Feature 同士が状態を密に共有する設計、Xcode のパッケージ操作の手間を避けたい場合。
+
+強制設定と check への組み込み:
+
+1. [architecture/thin-app-packages/Package.swift.example](architecture/thin-app-packages/Package.swift.example) を `Modules/Package.swift` にコピーし、HomeFeature・SettingsFeature を実際の機能名に変えます。
+2. [architecture/thin-app-packages/swiftlint-rules.yml](architecture/thin-app-packages/swiftlint-rules.yml) を `.swiftlint.yml` の末尾に統合します。既に `custom_rules:` があれば、その下に3つの規則を足します。
+3. [architecture/thin-app-packages/check-architecture.sh](architecture/thin-app-packages/check-architecture.sh) を `scripts/check-architecture.sh` にコピーします。
+4. Xcode で `Modules` をローカルパッケージとして追加し、App ターゲットに Feature と Clients のライブラリをつなぎます。
+5. check の環境（IDE の Git を含む）に `NATIVE_APP_ARCHITECTURE=thin-app-packages` と `NATIVE_APP_PACKAGE_DIR=Modules` を設定します。`sh scripts/check.sh architecture` で単独実行でき、`all` では lint の後・settings の前に走ります。未設定のまま `all` を流すと、選び方と設定手順を示して非0で止まります。
+
+検査の中身: `.swiftlint.yml` に3規則があること、パッケージの swift-format と SwiftLint（SOURCE_DIR の外でも検査）、`swift package dump-package` による宣言済み依存の向き、毎回新しいビルド先（`.native-check/run-*/architecture-build`）での、パッケージの scheme（`<名前>-Package`）の `xcodebuild build-for-testing`（`generic/platform=iOS Simulator`。Simulator は起動しません）。iOS 専用パッケージは macOS で `swift build` できないためです。未宣言ターゲットの import は差分ビルドだと通ることがあるため、DerivedData を再利用しません。SwiftUI などのシステムフレームワークはターゲット依存では止まらないので、SwiftLint の規則で止めます。Xcode アプリにつないだ場合も、差分ビルドでは通り、新しい DerivedData では失敗することを確かめています。xcodebuild はパッケージに `.swiftpm/` を作ることがあります（Xcode でパッケージを開いたときと同じ）。
+
+### 1ターゲット＋フォルダ規則
+
+Xcode のアプリターゲット1つに、`@Observable` を使う MV／MVVM でフォルダを分けます。同じモジュールの中では型が互いに見えるので、強制は SwiftLint の import 規則だけです。
+
+```mermaid
+flowchart TD
+    Views["Views（SwiftUI・ViewModel）"] --> Models["Models（@Observable・値型）"]
+    Views --> Services["Services（I/O）"]
+    Services --> Models
+```
+
+```text
+Sources/App/                  NATIVE_APP_SOURCE_DIR に含める
+├── YourApp.swift             @main
+├── Views/                    SwiftUI の画面。ViewModel を置くならここ
+├── Models/                   @Observable のモデル・値型
+└── Services/                 ネットワーク・保存
+Sources/AppTests/
+```
+
+| 規則 | MUST／MUST NOT |
+| --- | --- |
+| Models は SwiftUI・UIKit を import しない | MUST NOT |
+| Services は SwiftUI・UIKit を import しない | MUST NOT |
+| SwiftUI を使うのは Views だけにし、Views から Models と Services を呼ぶ | MUST |
+| Models から Views の型を参照しない（同じモジュールなので機械検査はなく、レビューで確かめる） | MUST NOT |
+| フォルダ名は Views・Models・Services にする（規則はパスの `/Models/`・`/Services/` で効く） | MUST |
+
+- 向く: 画面1〜2枚の道具、試作、1人で短期間に作るアプリ。
+- 向かない: 画面が増え続けるアプリ、並行開発、UI 抜きでロジックを分けてテストしたい場合。
+
+強制設定と check への組み込み:
+
+1. [architecture/single-target/swiftlint-rules.yml](architecture/single-target/swiftlint-rules.yml) を `.swiftlint.yml` の末尾に統合します。既に `custom_rules:` があれば、その下に2つの規則を足します。
+2. [architecture/single-target/check-architecture.sh](architecture/single-target/check-architecture.sh) を `scripts/check-architecture.sh` にコピーします。
+3. check の環境（IDE の Git を含む）に `NATIVE_APP_ARCHITECTURE=single-target` を設定します。未設定のままでは `all` が非0で止まります。
+
+lint 段階でも同じ規則が効きます。architecture 段階は規則が `.swiftlint.yml` から消えていないことを確かめ、2規則だけで SOURCE_DIR を検査します。
 
 ## Scope and references
 
